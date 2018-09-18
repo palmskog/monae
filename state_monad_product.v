@@ -375,3 +375,12 @@ Qed.
 Next Obligation.
 reflexivity.
 Qed.
+
+(* TODO: Add coercions, canonical projections and type annotations for the
+   following example to typecheck. *)
+
+Fail Definition nonce : MonadStateTrace.st_monad (stateTraceMonadExample nat nat) nat :=
+  do n : nat <- Get;
+  do _ : unit <- Put (S n);
+  do _ : unit <- Mark n;
+  Ret _ 0.
