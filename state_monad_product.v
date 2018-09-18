@@ -25,23 +25,33 @@ Let m (A : Type) : Type := S -> A*S.
 Record class_of : Type := Class {
   op_ret : forall A, A -> m A ;
   op_bind : forall A B, m A -> (A -> m B) -> m B ;
+  op_run : forall A, m A -> S -> A * S ;
   aaa : Laws.left_neutral op_bind op_ret ;
   bbb : Laws.right_neutral op_bind op_ret ;
-  ccc : Laws.associative op_bind }.
+  ccc : Laws.associative op_bind ;
+  hhh : forall A (a : A) s, op_run (op_ret a) s = (a, s) ;
+  iii : forall A B c (f : A -> m B) s,
+    op_run (op_bind c f) s = let (a, s') := op_run c s in op_run (f a) s'
+}.
 
 End Class.
 
 Record t : Type := Pack { m (A : Type) : Type := S -> A*S ; class : class_of }.
 
 Definition ret (M : t) A : A -> m M A :=
-  let: Pack _ (Class x _ _ _ _) := M in x A.
+  let: Pack _ (Class x _ _ _ _ _ _ _) := M in x A.
 
 Arguments ret {M A} : simpl never.
 
 Definition bind (M : t) A B : m M A -> (A -> m M B) -> m M B :=
-  let: Pack _ (Class _ x _ _ _) := M in x A B.
+  let: Pack _ (Class _ x _ _ _ _ _ _) := M in x A B.
 
 Arguments bind {M A B} : simpl never.
+
+Definition run (M : t) A : m M A -> S -> A * S :=
+  let: Pack _ (Class _ _ x _ _ _ _ _) := M in x A.
+
+Arguments run {M A} : simpl never.
 
 End MonadStateful.
 
@@ -53,6 +63,7 @@ Notation "'do' x : T <- m ; e" := (m >>= (fun x : T => e)) (only parsing).
 Notation "m >> f" := (m >>= fun _ => f) (at level 50).
 Notation Bind := bind.
 Notation Ret := ret.
+Notation Run := run.
 Notation statefulMonad := t.
 
 Coercion m : statefulMonad >-> Funclass.
@@ -74,8 +85,11 @@ Record mixin_of (S : Type) (M : statefulMonad S) : Type := Mixin {
   eee : forall s, put s >> get = put s >> Ret _ s ;
   fff : get >>= put = Ret _ tt ;
   ggg : forall k : S -> S -> M S,
-    get >>= (fun s => get >>= k s) = get >>= fun s => k s s
+    get >>= (fun s => get >>= k s) = get >>= fun s => k s s ;
+  jjj : forall s, Run get s = (s, s) ;
+  kkk : forall s s', Run (put s') s = (tt, s')
 }.
+
 Record class_of (S : Type) := Class {
   base : MonadStateful.class_of S ;
   mixin : mixin_of (MonadStateful.Pack base) }.
@@ -84,12 +98,12 @@ Structure t S : Type := Pack {
   m (A : Type) : Type := S -> A*S ; class : class_of S }.
 
 Definition op_get S (M : t S) : m M S :=
-  let: Pack _ (Class _ (Mixin x _ _ _ _ _)) := M return m M S in x.
+  let: Pack _ (Class _ (Mixin x _ _ _ _ _ _ _)) := M return m M S in x.
 
 Arguments op_get {S M} : simpl never.
 
 Definition op_put S (M : t S) : S -> m M unit :=
-  let: Pack _ (Class _ (Mixin _ x _ _ _ _)) := M return S -> m M unit in x.
+  let: Pack _ (Class _ (Mixin _ x _ _ _ _ _ _)) := M return S -> m M unit in x.
 
 Arguments op_put {S M} : simpl never.
 
@@ -228,7 +242,8 @@ End MonadTraceState.
 Program Example statefulMonadExample (S : Type) : statefulMonad S := {|
   MonadStateful.class := {|
     MonadStateful.op_ret := fun _ a s => (a, s) ;
-    MonadStateful.op_bind := fun _ _ m f s => let (a, s') := m s in f a s'
+    MonadStateful.op_bind := fun _ _ m f s => let (a, s') := m s in f a s' ;
+    MonadStateful.op_run := fun _ m s => m s
   |}
   |}.
 
@@ -251,6 +266,14 @@ extensionality s.
 destruct (m s); reflexivity.
 Qed.
 
+Next Obligation.
+reflexivity.
+Qed.
+
+Next Obligation.
+reflexivity.
+Qed.
+
 (* An example of state monad *)
 
 Program Example stateMonadExample (S : Type) : stateMonad S := {|
@@ -262,6 +285,14 @@ MonadState.class := {|
     |}
   |}
 |}.
+
+Next Obligation.
+reflexivity.
+Qed.
+
+Next Obligation.
+reflexivity.
+Qed.
 
 Next Obligation.
 reflexivity.
