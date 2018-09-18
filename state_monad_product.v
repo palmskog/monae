@@ -1,5 +1,6 @@
 Require Import Coq.Program.Tactics FunctionalExtensionality.
 Require Import List.
+Import ListNotations.
 Require Import monad.
 
 Obligation Tactic := idtac.
@@ -129,7 +130,8 @@ Export MonadState.Exports.
 
 Module MonadTrace.
 Record mixin_of (T : Type) (M : statefulMonad (list T)) : Type := Mixin {
-  mark : T -> M unit
+  mark : T -> M unit ;
+  lll : forall t l, Run (mark t) l = (tt, l ++ [t])
 }.
 Record class_of (T : Type) : Type := Class {
   base : MonadStateful.class_of (list T) ;
@@ -137,7 +139,7 @@ Record class_of (T : Type) : Type := Class {
 Structure t T := Pack {
   m (A : Type) : Type := list T -> A * list T ; class : class_of T }.
 Definition op_mark T (M : t T) : T -> m M unit :=
-  let: Pack _ (Class _ (Mixin x)) := M return T -> m M unit in x.
+  let: Pack _ (Class _ (Mixin x _)) := M return T -> m M unit in x.
 Arguments op_mark {T M} : simpl never.
 Definition baseType T (M : t T) := MonadStateful.Pack (base (class M)).
 Module Exports.
