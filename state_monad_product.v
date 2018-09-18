@@ -314,23 +314,64 @@ Qed.
 
 (* An example of trace monad *)
 
-Example traceMonadExample (T : Type) : traceMonad T := {|
+Program Example traceMonadExample (T : Type) : traceMonad T := {|
 MonadTrace.class := {|
   MonadTrace.base := MonadStateful.class (statefulMonadExample (list T)) ;
   MonadTrace.mixin := {|
-    MonadTrace.mark := fun t l => (tt, t::l)
+    MonadTrace.mark := fun t l => (tt, l ++ [t])
     |}
   |}
 |}.
 
+Next Obligation.
+reflexivity.
+Qed.
+
 (* The combination of previous examples *)
 
+(*
 Example stateTraceMonadExample (S T : Type) :=
   MonadStateTrace.stateTraceMonad
     (stateMonadExample S) (traceMonadExample T).
+*)
 
-(* The same combination of previous examples, but the other way round *)
+Program Example stateTraceMonadExample (S T : Type) :
+  MonadStateTrace.stateTraceMonad
+    (stateMonadExample S) (traceMonadExample T) := {|
+MonadStateTrace.st_monad := {|
+  MonadStateful.class := {|
+    MonadStateful.op_ret := fun _ a sl => (a, sl) ;
+    MonadStateful.op_bind := fun _ _ m f sl => let (a, sl') := m sl in f a sl' ;
+    MonadStateful.op_run := fun _ m sl => m sl
+    |}
+  |}
+|}.
 
-Example traceStateMonadExample (S T : Type) :=
-  MonadTraceState.traceStateMonad
-    (stateMonadExample S) (traceMonadExample T).
+Next Obligation.
+compute.
+intros S T A B a f.
+extensionality sl.
+reflexivity.
+Qed.
+
+Next Obligation.
+compute.
+intros S T A m.
+extensionality sl.
+destruct (m sl); reflexivity.
+Qed.
+
+Next Obligation.
+compute.
+intros S T A B C m f g.
+extensionality sl.
+destruct (m sl); reflexivity.
+Qed.
+
+Next Obligation.
+reflexivity.
+Qed.
+
+Next Obligation.
+reflexivity.
+Qed.
