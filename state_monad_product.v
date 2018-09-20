@@ -9,6 +9,7 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
+(*
 Require Import state_monad.
 
 Module MonadStateTraceNew.
@@ -91,6 +92,7 @@ End MonadStateTraceProd.
 Goal forall s t, @nonce_new (MonadStateTraceProd.Pack nat nat) (s, t) = (s, (S s, t ++ [s])).
 by [].
 Abort.
+*)
 
 (* The core part of all stateful monads *)
 (* REMARK: C'est un cas particulier de monade où le type [m] est forcé mais je
