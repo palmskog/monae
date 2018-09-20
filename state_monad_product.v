@@ -1,5 +1,5 @@
 Require Import ssrfun ssrbool ssreflect Coq.Program.Tactics FunctionalExtensionality.
-Require Import List.
+Require Import Nat List.
 Import ListNotations.
 Require Import monad.
 
@@ -291,34 +291,15 @@ Program Record stateTraceMonad : Type := {
 
 End MonadStateTrace.
 
+Module Exports.
+Notation Get := st_get.
+Notation Put := st_put.
+Notation Mark := st_mark.
+End Exports.
+
 End MonadStateTrace.
 
-(* The trace/state monad with trace on the left and state on the right *)
-(* TODO: A reformater sous forme de packed class ?*)
-
-Module MonadTraceState.
-
-Section MonadTraceState.
-
-Variables S T : Type.
-
-Variable Sm : stateMonad S.
-
-Variable Tm : traceMonad T.
-
-Program Record traceStateMonad : Type := {
-  st_monad : statefulMonad _ ;
-  st_get : st_monad S :=
-    mright (Get (M := Sm));
-  st_put : S -> st_monad unit :=
-    fun s' => mright (Put (M := Sm) s') ;
-  st_mark : T -> st_monad unit :=
-    fun t => mleft (Mark (M := Tm) t)
-}.
-
-End MonadTraceState.
-
-End MonadTraceState.
+Export MonadStateTrace.Exports.
 
 (** * EXAMPLES *)
 
@@ -412,12 +393,6 @@ Qed.
 
 (* The combination of previous examples *)
 
-(*
-Example stateTraceMonadExample (S T : Type) :=
-  MonadStateTrace.stateTraceMonad
-    (stateMonadExample S) (traceMonadExample T).
-*)
-
 Program Example stateTraceMonadExample (S T : Type) :
   MonadStateTrace.stateTraceMonad
     (stateMonadExample S) (traceMonadExample T) := {|
@@ -459,11 +434,11 @@ Next Obligation.
 reflexivity.
 Qed.
 
-(* TODO: Add coercions, canonical projections and type annotations for the
-   following example to typecheck. *)
+Definition nonce :
+  MonadStateTrace.st_monad (stateTraceMonadExample nat nat) nat :=
+  do n <- Get _;
+  do _ <- Put _ (S n);
+  do _ <- Mark _ n;
+  Ret _ n.
 
-Fail Definition nonce : MonadStateTrace.st_monad (stateTraceMonadExample nat nat) nat :=
-  do n : _ <- MonadStateTrace.st_get _;
-  do _ : unit <- MonadStateTrace.st_put _ (S n);
-  do _ : unit <- MonadStateTrace.st_mark _ _ n;
-  Ret (MonadStateTrace.st_monad (stateTraceMonadExample _ _)) 0.
+Compute Run (do n1 <- nonce ; do n2 <- nonce; Ret _ (n1 =? n2)) (0, []).
