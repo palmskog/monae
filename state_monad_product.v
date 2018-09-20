@@ -275,13 +275,8 @@ Module MonadStateTrace.
 
 Section MonadStateTrace.
 
-Variables S T : Type.
-
-Variable Sm : stateMonad S.
-
-Variable Tm : traceMonad T.
-
-Program Record stateTraceMonad : Type := {
+Program Record mixin_of (S T : Type) (Sm : stateMonad S) (Tm : traceMonad T) :
+  Type := Mixin {
   st_monad : statefulMonad _ ;
   st_get : st_monad S :=
     mleft (Get (M := Sm));
@@ -291,12 +286,45 @@ Program Record stateTraceMonad : Type := {
     fun t => mright (Mark (M := Tm) t)
 }.
 
+Record class_of (S T : Type) := Class {
+  base1 : MonadState.class_of S ;
+  base2 : MonadTrace.class_of T ;
+  mixin : mixin_of (MonadState.Pack base1) (MonadTrace.Pack base2) }.
+
+Structure t S T : Type := Pack {
+  m (A : Type) : Type := S * list T -> A * (S * list T) ; class : class_of S T
+}.
+
+Definition op_get S T (M : t S T) : m M S :=
+  let: Pack (Class _ _ (Mixin _ x _ _)) := M return m M S in x.
+
+Arguments op_get {S T M} : simpl never.
+
+Definition op_put S T (M : t S T) : S -> m M unit :=
+  let: Pack (Class _ _ (Mixin _ _ x _)) := M return S -> m M unit in x.
+
+Arguments op_put {S T M} : simpl never.
+
+Definition op_mark S T (M : t S T) : T -> m M unit :=
+  let: Pack (Class _ _ (Mixin _ _ _ x)) := M return T -> m M unit in x.
+
+Arguments op_mark {S T M} : simpl never.
+
+Definition baseType1 S T (M : t S T) := MonadState.Pack (base1 (class M)).
+
+Definition baseType2 S T (M : t S T) := MonadTrace.Pack (base2 (class M)).
+
 End MonadStateTrace.
 
 Module Exports.
 Notation Get := st_get.
 Notation Put := st_put.
 Notation Mark := st_mark.
+Notation stateTraceMonad := t.
+Coercion baseType1 : stateTraceMonad >-> stateMonad.
+Coercion baseType2 : stateTraceMonad >-> traceMonad.
+Canonical baseType1.
+Canonical baseType2.
 End Exports.
 
 End MonadStateTrace.
@@ -395,52 +423,18 @@ Qed.
 
 (* The combination of previous examples *)
 
-Program Example stateTraceMonadExample (S T : Type) :
-  MonadStateTrace.stateTraceMonad
-    (stateMonadExample S) (traceMonadExample T) := {|
-MonadStateTrace.st_monad := {|
-  MonadStateful.class := {|
-    MonadStateful.op_ret := fun _ a sl => (a, sl) ;
-    MonadStateful.op_bind := fun _ _ m f sl => let (a, sl') := m sl in f a sl' ;
-    MonadStateful.op_run := fun _ m sl => m sl
-    |}
-  |}
-|}.
+Example stateTraceMonadExample (S T : Type) :
+  stateTraceMonad S T := MonadStateTrace.Pack (MonadStateTrace.Class (
+  MonadStateTrace.Mixin (stateMonadExample S) (traceMonadExample T) 
+  (statefulMonadExample _))).
 
-Next Obligation.
-compute.
-intros S T A B a f.
-extensionality sl.
-reflexivity.
-Qed.
-
-Next Obligation.
-compute.
-intros S T A m.
-extensionality sl.
-destruct (m sl); reflexivity.
-Qed.
-
-Next Obligation.
-compute.
-intros S T A B C m f g.
-extensionality sl.
-destruct (m sl); reflexivity.
-Qed.
-
-Next Obligation.
-reflexivity.
-Qed.
-
-Next Obligation.
-reflexivity.
-Qed.
-
-Definition nonce :
-  MonadStateTrace.st_monad (stateTraceMonadExample nat nat) nat :=
-  do n <- Get _;
+Program Definition nonce  :=
+  do n <- Get (Sm := stateMonadExample _) (Tm := traceMonadExample _) _;
   do _ <- Put _ (S n);
   do _ <- Mark _ n;
   Ret _ n.
+
+Next Obligation.
+Admitted.
 
 Compute Run (do n1 <- nonce ; do n2 <- nonce; Ret _ (n1 =? n2)) (0, []).
