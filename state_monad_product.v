@@ -1,4 +1,5 @@
-Require Import ssrfun ssrbool ssreflect Coq.Program.Tactics FunctionalExtensionality.
+Require Import ssrfun ssrbool ssreflect Coq.Program.Tactics
+  FunctionalExtensionality.
 Require Import Nat List.
 Import ListNotations.
 Require Import monad.
@@ -89,7 +90,8 @@ Qed.
 End tmp.
 End MonadStateTraceProd.
 
-Goal forall s t, @nonce_new (MonadStateTraceProd.Pack nat nat) (s, t) = (s, (S s, t ++ [s])).
+Goal forall s t,
+  @nonce_new (MonadStateTraceProd.Pack nat nat) (s, t) = (s, (S s, t ++ [s])).
 by [].
 Abort.
 *)
