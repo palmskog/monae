@@ -382,7 +382,11 @@ Program Record mixin_of (S T : Type) (Sm : stateMonad S) (Tm : traceMonad T) :
   st_put : S -> st_monad unit :=
     fun s' => mleft (Put (M := Sm) s') ;
   st_mark : T -> st_monad unit :=
-    fun t => mright (Mark (M := Tm) t)
+    fun t => mright (Mark (M := Tm) t) ;
+  mark_get : forall t,
+    st_mark t >> st_get = do x <- st_get ; st_mark t >> Ret x ;
+  mark_put : forall s t,
+    st_mark t >> st_put s = st_put s >> st_mark t
 }.
 
 Record class_of (S T : Type) := Class {
@@ -395,17 +399,17 @@ Structure t S T : Type := Pack {
 }.
 
 Definition op_get S T (M : t S T) : m M S :=
-  let: Pack (Class _ _ (Mixin _ x _ _)) := M return m M S in x.
+  let: Pack (Class _ _ (Mixin _ x _ _ _ _)) := M return m M S in x.
 
 Arguments op_get {S T M} : simpl never.
 
 Definition op_put S T (M : t S T) : S -> m M unit :=
-  let: Pack (Class _ _ (Mixin _ _ x _)) := M return S -> m M unit in x.
+  let: Pack (Class _ _ (Mixin _ _ x _ _ _)) := M return S -> m M unit in x.
 
 Arguments op_put {S T M} : simpl never.
 
 Definition op_mark S T (M : t S T) : T -> m M unit :=
-  let: Pack (Class _ _ (Mixin _ _ _ x)) := M return T -> m M unit in x.
+  let: Pack (Class _ _ (Mixin _ _ _ x _ _)) := M return T -> m M unit in x.
 
 Arguments op_mark {S T M} : simpl never.
 
@@ -436,16 +440,21 @@ Export MonadStateTrace.Exports.
 
 (* An example of state/trace monad *)
 
-Example stateTraceMonadExample (S T : Type) :
+Program Example stateTraceMonadExample (S T : Type) :
   stateTraceMonad S T := MonadStateTrace.Pack (MonadStateTrace.Class (
   MonadStateTrace.Mixin
-    (stateMonadExample S) (traceMonadExample T) (statefulMonadExample _))).
+    _ _ (Sm := stateMonadExample S) (Tm := traceMonadExample T)
+    (st_monad := statefulMonadExample _))).
 
-Example tnonce : stateTraceMonadExample _ nat _ :=
+Solve Obligations with reflexivity.
+
+Program Example tnonce : stateTraceMonadExample _ nat _ :=
   do n <- Get (Sm := stateMonadExample _) (Tm := traceMonadExample _)
    {| MonadStateTrace.st_monad := statefulMonadExample _ |};
   do _ <- Put _ (S n);
   do _ <- Mark _ n;
   Ret n.
+
+Solve Obligations with reflexivity.
 
 Compute Run (do n1 <- tnonce ; do n2 <- tnonce; Ret (n1 =? n2)) (0, []).
