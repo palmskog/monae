@@ -5,21 +5,52 @@
 
 Require Import ssreflect ssrfun ssrbool FunctionalExtensionality Eqdep List.
 Import ListNotations.
-Require Import monad state_monad trace_monad smallstep.
+Require Import monad state_monad_product smallstep.
 
 Section DenotationalSemantics.
 
-Variables T S : Type.
-Variable M : stateTraceMonad T S.
+Variables S T : Type.
+Variable M0 : statefulMonad (S * list T).
+Variable M1 : stateMonad S.
+Variable M2 : traceMonad T.
 
-Fixpoint denotation {A : Type} (p : program A) : M A :=
+Program Let M : stateTraceMonad S T :=
+  MonadStateTrace.Pack (MonadStateTrace.Class
+    (base1 := MonadState.class M1) (base2 := MonadTrace.class M2) (
+  MonadStateTrace.Mixin
+    _ _ (Sm := M1) (Tm := M2) (st_monad := M0))).
+
+Next Obligation.
+intro t.
+extensionality sl.
+destruct sl as [s l].
+set (f := MonadState.Exports.Get).
+set (g := MonadTrace.Exports.Mark t).
+Admitted.
+
+Next Obligation.
+intros s t.
+extensionality sl.
+set (f := MonadTrace.Exports.Mark t).
+set (g := MonadState.Exports.Put s).
+Admitted.
+
+Next Obligation.
+destruct M1; reflexivity.
+Qed.
+
+Next Obligation.
+destruct M2; reflexivity.
+Qed.
+
+Program Fixpoint denotation {A : Type} (p : program A) : M A :=
   match p with
   | p_ret _ v => Ret v
   | p_bind _ _ m f => do a <- denotation m; denotation (f a)
   | p_cond _ b p1 p2 => if b then denotation p1 else denotation p2
-  | p_get => Get
-  | p_put s' => Put s'
-  | p_mark t => Mark t
+  | p_get => Get (Sm := M1) (Tm := M2) (MonadStateTrace.mixin _)
+  | p_put s' => Put _ s'
+  | p_mark t => Mark _ t
   end.
 
 Fixpoint denotation_continuation (k : continuation) : M (@continuation T S) :=
