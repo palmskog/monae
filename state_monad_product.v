@@ -359,16 +359,11 @@ Definition assoc {A B C : Type} (x : (A * B) * C) : A * (B * C) :=
 Definition assoc_inv {A B C : Type} (x : A * (B * C)) : (A * B) * C :=
   ((fst x, fst (snd x)), snd (snd x)).
 
-Definition comp {A B C : Type} (g : B -> C) (f : A -> B) : A -> C :=
-  fun x => g (f x).
-
-Notation "g 'o' f" := (comp g f) (at level 40, left associativity).
-
 Definition mleft {A B C D : Type} (f : A -> B * C) : A * D -> B * (C * D):=
-  assoc o product f id.
+  assoc \o product f id.
 
 Definition mright {A B C D : Type} (f : A -> B * C) : D * A -> B * (D * C) :=
-  assoc o product swap id o assoc_inv o product id f.
+  assoc \o product swap id \o assoc_inv \o product id f.
 
 Module MonadStateTrace.
 
