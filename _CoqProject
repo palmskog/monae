@@ -7,7 +7,8 @@ proba_model.v
 trace_monad.v
 trace_model.v
 smallstep.v
-state_monad_product.v
+state_trace_product_monad.v
+state_trace_product_model.v
 smallstep_monad.v
 smallstep_examples.v
 -R . monad

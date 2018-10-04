@@ -1,6 +1,6 @@
 Require Import FunctionalExtensionality Nat List.
 Import ListNotations.
-Require Import state_product_monad.
+Require Import state_trace_product_monad.
 
 Obligation Tactic := idtac.
 

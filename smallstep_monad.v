@@ -5,7 +5,7 @@
 
 Require Import ssreflect ssrfun ssrbool FunctionalExtensionality Eqdep List.
 Import ListNotations.
-Require Import monad state_monad_product smallstep.
+Require Import monad state_trace_product_monad smallstep.
 
 Section DenotationalSemantics.
 
