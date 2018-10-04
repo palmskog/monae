@@ -330,9 +330,9 @@ End MonadStateTrace.
 
 Module Exports.
 
-Notation Get := st_get.
-Notation Put := st_put.
-Notation Mark := st_mark.
+Notation Get := op_get.
+Notation Put := op_put.
+Notation Mark := op_mark.
 Notation stateTraceMonad := t.
 
 Coercion baseType1 : stateTraceMonad >-> stateMonad.
@@ -357,13 +357,10 @@ Program Example stateTraceMonadExample (S T : Type) :
 
 Solve Obligations with reflexivity.
 
-Program Example tnonce : stateTraceMonadExample _ nat _ :=
-  do n <- Get (Sm := stateMonadExample _) (Tm := traceMonadExample _)
-   {| MonadStateTrace.st_monad := statefulMonadExample _ |};
-  do _ <- Put _ (S n);
-  do _ <- Mark _ n;
+Example tnonce : stateTraceMonadExample _ nat _ :=
+  do n <- Get (stateTraceMonadExample nat nat);
+  do _ <- Put (stateTraceMonadExample nat nat) (S n);
+  do _ <- Mark (stateTraceMonadExample nat nat) n;
   Ret n.
-
-Solve Obligations with reflexivity.
 
 Compute Run (do n1 <- tnonce ; do n2 <- tnonce; Ret (n1 =? n2)) (0, []).
