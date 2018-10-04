@@ -1,4 +1,5 @@
 Require Import FunctionalExtensionality Coq.Program.Tactics ProofIrrelevance.
+Require Import Coq.Logic.IndefiniteDescription.
 Require Classical.
 Require Import ssreflect ssrmatching ssrfun ssrbool.
 From mathcomp Require Import eqtype ssrnat seq choice fintype tuple.
@@ -19,6 +20,7 @@ Unset Printing Implicit Defensive.
 - Module MonadFreshFail.
     example of tree relabeling
 - n-queens puzzle by Mu
+  sections 4-5
 *)
 
 Module MonadState.
@@ -96,14 +98,14 @@ Definition step1 : Z`2 -> (bool * (seq Z)`2) -> bool * (seq Z)`2 :=
     (thisOK && restOK, updowns').
 
 (* over the list of column-row pairs
-   bool * (seq nat)`2: queens to the right safe or not,
+   bool * (seq Z)`2: queens to the right safe or not,
                        up/down diagonals under threat from the queens so far *)
 Definition safe1 : (seq Z)`2 -> seq Z`2 -> bool * (seq Z)`2 :=
   foldr step1 \o start1.
 
-Definition queens {M : nondetMonad} n : M (seq nat) :=
-  do rs <- perms (iota 0 n) ;
-     (guard (safe1 empty (place n (map Z_of_nat rs))).1 >> Ret rs).
+Definition queens {M : nondetMonad} n : M (seq Z) :=
+  do rs <- perms (map Z_of_nat (iota 0 n)) ;
+     (guard (safe1 empty (place n rs)).1 >> Ret rs).
 
 End purely_functional.
 
@@ -253,6 +255,18 @@ Lemma runput : forall s s', Run0 (Put s' : M _) s = (tt, s').
 Proof. by case: M => m [? []]. Qed.
 End staterun_lemmas.
 
+Section safe_reification.
+
+Variable M : stateRunMonad (seq Z)`2.
+
+Lemma run_safe2 crs updowns : Run0 (safe2 crs : M _) updowns = safe1 updowns crs.
+Proof.
+rewrite safe2E runbind runget; case: safe1 => a b.
+by rewrite runbind runput runret.
+Qed.
+
+End safe_reification.
+
 Module MonadNondetState.
 Record mixin_of (M : nondetMonad) : Type := Mixin {
   (* backtrackable state *)
@@ -285,6 +299,10 @@ Proof. by case: M => m [? ? [? ?]]. Qed.
 Lemma alt_bindDr : Laws.bind_right_distributive (@Bind M) [~p].
 Proof. by case: M => m [? ? []]. Qed.
 End nondetstate_lemmas.
+
+Lemma getput_prepend S (M : nondetStateMonad S) A (m : M A) :
+  m = do x <- Get; (Put x >> m).
+Proof. by rewrite -{2}(bindskipf m) -bindA getputskip 2!bindskipf. Qed.
 
 Section state_commute.
 
@@ -376,19 +394,84 @@ Qed.
 
 End state_commute.
 
-Lemma getput_prepend S (M : nondetStateMonad S) A (m : M A) :
-  m = do x <- Get; (Put x >> m).
-Proof. by rewrite -{2}(bindskipf m) -bindA getputskip 2!bindskipf. Qed.
+Definition nondetState_sub {S} {M : nondetStateMonad S} {A} (n : M A) : Type :=
+  {m | ndDenote m = n}.
+
+Lemma select_is_nondetState S (M : nondetStateMonad S) A (s : seq A) :
+  nondetState_sub (select s : M _).
+Proof.
+elim: s => [/= | u v [x /= <-]]; first by exists (@ndFail _).
+by exists (ndAlt (ndRet (u, v)) (ndBind x (fun x => ndRet (x.1, u :: x.2)))).
+Qed.
+
+Lemma unfoldM_is_nondetState S (M : nondetStateMonad S) A B
+  (f : seq B -> M (A * seq B)%type) :
+  (forall s, nondetState_sub (f s)) -> bassert_size f ->
+  forall s, nondetState_sub (unfoldM (@well_founded_size B) (@nilp _) f s).
+Proof.
+move=> Hf size_f s.
+apply/constructive_indefinite_description.
+move: s; apply: (well_founded_induction (@well_founded_size _)) => s IH.
+have {IH}IH : forall x, size x < size s ->
+  { m | ndDenote m = unfoldM (@well_founded_size B) (@nilp _) f x}.
+  move=> x xs; exact/constructive_indefinite_description/IH.
+case: s IH => [|h t] IH.
+  rewrite unfoldME //=; by exists (ndRet [::]).
+rewrite unfoldME //=.
+case: (Hf (h :: t)) => x Hx.
+rewrite -Hx /fmap.
+set g := fun y => match Bool.bool_dec (size y < size (h :: t)) true with
+               | left H => let: exist x _ := IH _ H in x
+               | _ => ndRet [::]
+               end.
+refine (ex_intro _ (ndBind x (fun x => ndBind (g x.2) (@ndRet _ \o cons x.1 ))) _) => /=.
+rewrite Hx size_f /bassert !bindA.
+bind_ext => -[x1 x2].
+rewrite /assert /guard /= ltnS.
+case: ifPn => b1b2; last by rewrite !bindfailf.
+rewrite !bindskipf !bindretf /= /g.
+case: Bool.bool_dec => //= x2t.
+by case: (IH x2) => // x0 <-.
+Qed.
+
+(* theorem 5.2, mu2017 *)
+Lemma commute_nondetState {S} {M : nondetStateMonad S}
+  A (m : M A) B (n : M B) C (f : A -> B -> M C) :
+  nondetState_sub m -> commute m n f.
+Proof.
+case => x.
+elim: x m n f => [{A}A a m n f <-| B0 {A}A n0 H0 n1 H1 m n2 f <- |
+  A0 m n f <- | A0 n0 H0 n1 H1 m n2 f <-].
+- rewrite /commute bindretf.
+  by rewrite_ bindretf.
+- rewrite /commute /= !bindA.
+  transitivity (do x <- ndDenote n0; do y <- n2 : M _; do x0 <- ndDenote (n1 x);
+    f x0 y).
+    bind_ext => s.
+    by rewrite (H1 s).
+  rewrite H0 //.
+  bind_ext => b.
+  by rewrite bindA.
+- rewrite /commute /= bindfailf.
+  transitivity (do y <- n; Fail : M C); first by rewrite bindmfail.
+  bind_ext => b.
+  by rewrite bindfailf.
+- rewrite /commute /= alt_bindDl.
+  transitivity (do y <- n2; (do x <- ndDenote n0 ; f x y) [~i] do x <- ndDenote n1; f x y); last first.
+    bind_ext => a.
+    by rewrite alt_bindDl.
+  by rewrite alt_bindDr H0 // H1.
+Qed.
 
 Section queens_statefully_nondeterministically.
 
 Variable M : nondetStateMonad (seq Z)`2.
 
-Definition queens_state_nondeter n : M (seq nat) :=
+Definition queens_state_nondeter n : M (seq Z) :=
   do s <- Get ;
-    do rs <- perms (iota 0 n);
+    do rs <- perms (map Z_of_nat (iota 0 n));
       Put empty >>
-        (do ok <- safe2 (place n (map Z_of_nat rs)) ;
+        (do ok <- safe2 (place n rs) ;
              (Put s >> guard ok)) >> Ret rs.
 
 Lemma queensE n : queens n = queens_state_nondeter n.
@@ -398,8 +481,8 @@ rewrite {1}/queens putpermsC; bind_ext => y.
 rewrite safe2E.
 set f := (do ok <- (do _ <- _; _); _ >> guard ok in RHS).
 rewrite (_ : f =
-  do uds <- Get; Put (safe1 uds (place n (map Z_of_nat y))).2 >> Ret (safe1 uds (place n (map Z_of_nat y))).1 >>
-      Put x >> guard (safe1 uds (place n (map Z_of_nat y))).1); last first.
+  do uds <- Get; Put (safe1 uds (place n y)).2 >> Ret (safe1 uds (place n y)).1 >>
+      Put x >> guard (safe1 uds (place n y)).1); last first.
   rewrite {}/f bindA; bind_ext => u.
   case: (safe1 _ _) => a b.
   rewrite 2!bindA bindretf bindA.
@@ -422,9 +505,9 @@ Variable M : nondetStateMonad (seq Z)`2.
 
 Definition queens_explor n : M _ :=
   do s <- Get;
-    do rs <- perms (iota 0 n);
+    do rs <- perms (map Z_of_nat (iota 0 n));
       Put empty >>
-        (do ok <- safe2 (place n (map Z_of_nat rs)) ;
+        (do ok <- safe2 (place n rs) ;
              (guard ok >> Put s)) >> Ret rs.
 
 Lemma queens_explorE n : queens_explor n = queens_state_nondeter n.
@@ -446,8 +529,8 @@ Definition safe3 crs : M _ := safe2 crs >>= fun b => guard b.
 
 Definition queens_safe3 n : M _ :=
   do s <- Get;
-    (do rs <- perms (iota 0 n);
-      Put empty >> safe3 (place n (map Z_of_nat rs)) >> Put s >> Ret rs).
+    (do rs <- perms (map Z_of_nat (iota 0 n)) ;
+      Put empty >> safe3 (place n rs) >> Put s >> Ret rs).
 
 Lemma queens_safe3E n : queens_safe3 n = queens_explor n :> M _.
 Proof.
@@ -949,7 +1032,6 @@ Proof. by rewrite dlabels_relabel_is_fold symbols_size_is_fold. Qed.
 
 End tree_relabelling.
 
-(* mu2017, section 4-5 except monadic hylo-fusion *)
 Section mu2017.
 
 (* TODO: move *)
@@ -960,23 +1042,18 @@ Section queens_definition.
 
 Local Open Scope mu_scope.
 
-Let addZ := fun x => Zplus (Z_of_nat x).
-Let subZ := fun x => Zminus (Z_of_nat x).
-
-Definition ups s : seq Z := zipWith addZ (iota 0 (size s)) s.
-Definition downs s : seq Z := zipWith subZ (iota 0 (size s)) s.
-Definition safe s := uniq (ups s) && uniq (downs s).
+Definition ups s i := zipWith Zplus (map Z_of_nat (iota i (size s))) s.
+Definition downs s i := zipWith Zminus (map Z_of_nat (iota i (size s))) s.
+Definition safe s := uniq (ups s 0) && uniq (downs s 0).
 
 Definition queens_example := [:: 3; 5; 7; 1; 6; 0; 2; 4]%Z.
 Eval compute in safe queens_example.
 
 Definition mu_queens {M : nondetMonad} n : M (seq Z) :=
-  (map Z_of_nat ($) perms (iota 0 n)) >>= assert safe.
+  perms (map Z_of_nat (iota 0 n)) >>= assert safe.
 
 Definition safeAcc i (us ds : seq Z) (xs : seq Z) :=
-  let n := size xs in
-  let us' := zipWith addZ (iota i n) xs in
-  let ds' := zipWith subZ (iota i n) xs in
+  let us' := ups xs i in let ds' := downs xs i in
   uniq us' && uniq ds' && all (fun x => x \notin us) us' && all (fun x => x \notin ds) ds'.
 
 Lemma safeE : safe =1 safeAcc 0 [::] [::].
@@ -985,7 +1062,7 @@ move=> s; rewrite /safe /safeAcc.
 by rewrite (sub_all _ (@all_predT _ _)) // (sub_all _ (@all_predT _ _)) // !andbT.
 Qed.
 
-Definition queens_ok (i_xus_yds : (Z * seq Z * seq Z)%type) :=
+Definition queens_ok (i_xus_yds : Z * seq Z * seq Z) :=
   let: (_, xus, yds) := i_xus_yds in
   match xus, yds with
   | x :: us, y :: ds => (x \notin us) && (y \notin ds)
@@ -1000,14 +1077,14 @@ Definition safeAcc_scanl i (us ds : seq Z) :=
   let op i_us_ds x := queens_next i_us_ds x in
   all ok \o scanl op (i, us, ds).
 
-Lemma safeAccE i a b : safeAcc i a b =1 safeAcc_scanl (Z.of_nat i) a b.
+Lemma safeAccE i a b : safeAcc i a b =1 safeAcc_scanl (Z_of_nat i) a b.
 Proof.
 move=> s; elim: s i a b => // h t IH i a b.
 rewrite /safeAcc_scanl /=.
 move: (IH i.+1 ((Z.of_nat i + h) :: a) ((Z.of_nat i - h) :: b))%Z.
 rewrite (_ : Z.of_nat i.+1 = (Z.of_nat i) + 1)%Z; last by rewrite -addn1 Nat2Z.inj_add.
 rewrite /safeAcc_scanl => /= <-.
-rewrite /safeAcc /= !andbA /zipWith /= -/(subZ _) -/(addZ _).
+rewrite /safeAcc /= !andbA /zipWith /=.
 set A := uniq _. set B := uniq _. set sa := map _ _. set sb := map _ _.
 rewrite -![in LHS]andbA [in LHS]andbC.
 do 2 rewrite -![in RHS]andbA [in RHS]andbC.
@@ -1016,8 +1093,8 @@ rewrite -[in LHS]andbC -!andbA; congr andb.
 do 2 rewrite ![in RHS]andbA [in RHS]andbC.
 congr andb.
 rewrite [in LHS]andbCA -![in RHS]andbA; congr andb.
-have H : forall op y s, all (fun x : Z => x \notin op i h :: y) s =
-  all (fun x : Z => x \notin y) s && (op i h \notin s).
+have H : forall (op : Z -> Z -> Z) y s, all (fun x : Z => x \notin op (Z_of_nat i) h :: y) s =
+  all (fun x : Z => x \notin y) s && (op (Z_of_nat i) h \notin s).
   move=> op y; elim => //= s1 s2 ih /=; rewrite ih !inE !negb_or.
   rewrite -andbA andbCA !andbA; congr (_ && _); rewrite -!andbA; congr(_ && _).
   by rewrite andbC eq_sym.
@@ -1025,7 +1102,7 @@ by rewrite andbA andbCA -!andbA andbCA !andbA -H -andbA -H.
 Qed.
 
 Lemma mu_queensE {M : nondetMonad} n : mu_queens n =
-  (map Z_of_nat ($) perms (iota 0 n)) >>= assert (safeAcc_scanl 0 [::] [::]) :> M _.
+  perms (map Z_of_nat (iota 0 n)) >>= assert (safeAcc_scanl 0 [::] [::]) :> M _.
 Proof.
 rewrite /mu_queens; bind_ext => s; by rewrite /assert (safeE s) safeAccE.
 Qed.
@@ -1101,11 +1178,12 @@ End loop.
 Section section_51.
 
 Variables (S : Type) (M : nondetStateMonad S).
-Variables (A : Type) (op : S -> A -> S) (ok : ssrbool.pred S).
+Variables (A : Type) (op : S -> A -> S) (ok : pred S).
 
-Lemma assertE (st : S) (xs : seq A) : assert (all ok \o scanl op st) xs =
+Lemma assert_all_scanl (st : S) (xs : seq A) :
+  assert (all ok \o scanl op st) xs =
   Get >>= (fun ini => loopp _ op st xs >>=
-    (fun ys => guard (all ok ys) >> Ret xs >>= overwrite ini) : M _).
+    (fun ys => guard (all ok ys) >> Ret xs >>= overwrite ini)) :> M _.
 Proof.
 rewrite /assert.
 rewrite guardsC; last exact: bindmfail.
@@ -1210,8 +1288,7 @@ transitivity (do st <- Get; guard (ok (op st x)) >>
   rewrite fcomp_ext fmap_bind /=.
   bind_ext; case.
   by rewrite fcomp_ext fmap_ret.
-rewrite /= -(IH).
-by rewrite /opdot !bindA.
+by rewrite /= -IH /opdot !bindA.
 Qed.
 
 End section_51.
@@ -1220,43 +1297,175 @@ Section section_52.
 
 Variable M : nondetStateMonad (Z * seq Z * seq Z).
 
-Definition op : Z -> M (seq Z) -> M (seq Z) := opdot queens_next queens_ok.
+Definition opdot_queens : Z -> M (seq Z) -> M (seq Z) := opdot queens_next queens_ok.
 
 Local Open Scope mu_scope.
 
-Definition queensBody (xs : seq nat) : M (seq Z) :=
-  map Z.of_nat ($) perms xs >>= foldr op (Ret [::]).
+Definition queensBody (xs : seq Z) : M (seq Z) :=
+  perms xs >>= foldr opdot_queens (Ret [::]).
 
 Lemma mu_queens_state_nondeter n : mu_queens n = Get >>=
-  (fun ini => Put (0, [::], [::])%Z >> queensBody (iota 0 n) >>= overwrite ini).
+  (fun ini => Put (0, [::], [::])%Z >> queensBody (map Z_of_nat (iota 0 n)) >>= overwrite ini).
 Proof.
 rewrite mu_queensE.
-transitivity (map Z.of_nat ($) perms (iota 0 n) >>= (fun xs => Get >>=
-  (fun ini => Put (0, [::], [::])%Z >> foldr op (Ret [::]) xs >>= overwrite ini))).
-  rewrite 2!bind_fmap; bind_ext => s /=.
-  rewrite assertE. (* NB: uses theorem 4.1 *)
+transitivity (perms (map Z.of_nat (iota 0 n)) >>= (fun xs => Get >>=
+  (fun ini => Put (0, [::], [::])%Z >> foldr opdot_queens (Ret [::]) xs >>= overwrite ini))).
+  bind_ext => s /=.
+  rewrite assert_all_scanl. (* NB: uses theorem 4.1 *)
   bind_ext => st.
   rewrite 2!bindA.
   bind_ext; case.
   by rewrite -theorem_53 bindA.
 transitivity (Get >>= (fun ini => Put (0, [::], [::])%Z >>
-  map Z.of_nat ($) perms (iota 0 n) >>= (fun xs => (foldr op (Ret [::]) xs >>= overwrite ini)))).
-  transitivity (do ini <- Get; do xs <- map Z.of_nat ($) perms (iota 0 n);
-    do x <- Put (0%Z, [::], [::]) >> foldr op (Ret [::]) xs; overwrite ini x).
-    rewrite bindA.
-    rewrite_ bindretf.
-    rewrite -getpermsC.
-    bind_ext => x.
-    by rewrite bind_fmap.
+  perms (map Z.of_nat (iota 0 n)) >>= (fun xs => (foldr opdot_queens (Ret [::]) xs >>= overwrite ini)))).
+  rewrite -getpermsC.
   bind_ext => s.
   rewrite !bindA putpermsC.
-  bind_ext => xs.
-  rewrite bindretf bindA.
-  by rewrite_ bindretf.
+  by rewrite_ bindA.
 bind_ext => st.
 by rewrite !bindA.
 Qed.
 
 End section_52.
+
+Definition seed_select {M : nondetStateMonad (Z * seq Z * seq Z)%type} :=
+  fun (p : pred (seq Z)) (f : seq Z -> M (Z * seq Z)%type)
+  (a b : seq Z) => size a < size b.
+
+(* direct proof of theorem 4.2 *)
+Section theorem_42.
+Variables (M : nondetStateMonad (Z * seq Z * seq Z)%type).
+
+Local Open Scope mu_scope.
+
+Notation unfoldM := (unfoldM (@well_founded_size _)).
+
+Let op := @opdot_queens M.
+Let p := @nilp Z.
+
+Lemma base_case y : p y -> (foldr op (Ret [::]) >=> unfoldM p select) y = Ret [::].
+Proof.
+move=> py.
+transitivity (foldr op (Ret [::]) =<< Ret [::]).
+  rewrite /kleisli /rbind bindretf /= join_fmap unfoldME; last exact: decr_size_select.
+  by rewrite py bindretf.
+by rewrite /rbind bindretf.
+Qed.
+
+Lemma theorem_42 :
+  (foldr op (Ret [::]) >=> unfoldM p select) =1
+  @hyloM _ _ _ _ op [::] p select seed_select (@well_founded_size _).
+Proof.
+apply: (well_founded_induction (@well_founded_size _)) => y IH.
+rewrite hyloME; last exact: decr_size_select.
+case/boolP : (p y) => py.
+  by rewrite base_case.
+rewrite /rkleisli /kleisli /= join_fmap.
+rewrite unfoldME; last exact: decr_size_select.
+rewrite (negbTE py) bindA.
+rewrite(@decr_size_select _ _) /bassert !bindA; bind_ext => -[b a] /=.
+rewrite /assert /guard /=.
+case: ifPn => ay; last by rewrite !bindfailf.
+rewrite bindskipf !bindretf /= -IH // bind_fmap /kleisli /= join_fmap.
+suff : do x <- unfoldM p select a; op b (foldr op (Ret [::]) x) =
+  op b (do x <- unfoldM p select a; foldr op (Ret [::]) x) by done.
+rewrite {ay}.
+move: a b.
+apply: (well_founded_induction (@well_founded_size _)) => a IH' b.
+destruct a as [|u v] => //.
+  rewrite unfoldME /=; last exact: decr_size_select.
+  by rewrite !bindretf /=.
+rewrite unfoldME /=; last exact: decr_size_select.
+rewrite !bindA.
+transitivity (do x <- Ret (u, v) [~i] (do y_ys <- select v; Ret (y_ys.1, u :: y_ys.2));
+  op b (do x0 <- cons x.1 ($) unfoldM p select x.2; foldr op (Ret [::]) x0)); last first.
+  apply/esym.
+  rewrite {1}/op /opdot_queens /opdot fmap_bind.
+  transitivity (do st <- Get;
+  (guard (queens_ok (queens_next st b)) >> do x <- Ret (u, v) [~i] (do y_ys <- select v; Ret (y_ys.1, u :: y_ys.2));
+   (Put (queens_next st b)) >>
+  ((cons b
+    (o) (fun x : Z * seq Z => do x0 <- cons x.1 ($) unfoldM p select x.2; foldr op (Ret [::]) x0)) x))).
+    bind_ext => st.
+    rewrite !bindA.
+    bind_ext; case.
+    rewrite -commute_nondetState //.
+    case: (@select_is_nondetState _ M _ v) => x <-.
+    by exists (ndAlt (ndRet (u, v)) (ndBind x (fun y => ndRet (y.1, u :: y.2)))).
+  transitivity (do st <- Get;
+  (do x <- Ret (u, v) [~i] (do y_ys <- select v; Ret (y_ys.1, u :: y_ys.2)) : M _;
+  guard (queens_ok (queens_next st b)) >>
+   Put (queens_next st b) >>
+   (cons b
+    (o) (fun x0 : Z * seq Z => do x1 <- cons x0.1 ($) unfoldM p select x0.2; foldr op (Ret [::]) x1))
+     x)).
+    bind_ext => st.
+    rewrite -bindA guardsC; last exact: bindmfail.
+    rewrite !bindA.
+    bind_ext => x.
+    rewrite !bindA.
+    bind_ext; case.
+    by rewrite bindretf.
+  rewrite -commute_nondetState //.
+  case: (@select_is_nondetState _ M _ v) => x <-.
+  by exists (ndAlt (ndRet (u, v)) (ndBind x (fun y => ndRet (y.1, u :: y.2)))).
+bind_ext => x.
+rewrite {1}/op /opdot_queens /opdot.
+rewrite commute_nondetState; last first.
+  rewrite /fmap.
+  case: (unfoldM_is_nondetState (@select_is_nondetState _ M Z) (@decr_size_select M _) x.2).
+  move=> m <-.
+  by exists (ndBind m (fun y => ndRet (x.1 :: y))).
+rewrite {2}/op /opdot_queens /opdot.
+bind_ext => st.
+rewrite commute_nondetState //; last first.
+   case: (unfoldM_is_nondetState (@select_is_nondetState _ M Z) (@decr_size_select _ _) x.2).
+   move=> m <-.
+   by exists (ndBind m (fun y => ndRet (x.1 :: y))).
+bind_ext; case.
+rewrite !bind_fmap !fmap_bind.
+by bind_ext.
+Qed.
+
+End theorem_42.
+
+Section section_52_contd.
+
+Variables (M : nondetStateMonad (Z * seq Z * seq Z)%type).
+
+Local Open Scope mu_scope.
+
+Lemma queensBodyE : queensBody M =
+  hyloM (@opdot_queens M) [::] (@nilp _) select seed_select (@well_founded_size _).
+Proof.
+rewrite /queensBody; apply functional_extensionality.
+case => [|h t].
+  rewrite /= permsE /= hyloME; last 2 first.
+    by rewrite bindretf.
+    exact: decr_size_select.
+rewrite [h :: t]lock -theorem_42.
+by rewrite /kleisli /= join_fmap perms_mu_perm.
+Qed.
+
+Lemma queensBodyE' xs : queensBody M xs = if xs is [::] then Ret [::] else
+  select xs >>= (fun xys =>
+  Get >>= (fun st => guard (queens_ok (queens_next st xys.1)) >>
+  Put (queens_next st xys.1) >> (cons xys.1 ($) queensBody M xys.2))).
+Proof.
+case: xs => [|h t].
+  rewrite queensBodyE // hyloME //; exact: decr_size_select.
+rewrite {1}queensBodyE hyloME; last exact: decr_size_select.
+rewrite {-1}[h :: t]lock /= decr_size_select /bassert 2!bindA.
+bind_ext => -[x ys] /=.
+rewrite /assert /guard /=.
+case: ifPn => ysht; last by rewrite !bindfailf.
+rewrite bindskipf !bindretf /opdot_queens /opdot.
+bind_ext => st.
+rewrite !bindA; bind_ext; case.
+bind_ext; case => /=.
+by rewrite queensBodyE.
+Qed.
+
+End section_52_contd.
 
 End mu2017.
