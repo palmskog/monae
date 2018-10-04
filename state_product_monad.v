@@ -1,6 +1,4 @@
-Require Import ssrfun ssrbool ssreflect Coq.Program.Tactics
-  FunctionalExtensionality.
-Require Import Nat List.
+Require Import ssrfun List.
 Import ListNotations.
 Require Import monad.
 
@@ -77,49 +75,6 @@ End MonadStateful.
 
 Export MonadStateful.Exports.
 
-(* An example of stateful monad *)
-
-Program Example statefulMonadExample (S : Type) : statefulMonad S := {|
-  MonadStateful.class := {|
-    MonadStateful.op_ret := fun _ a s => (a, s) ;
-    MonadStateful.op_bind := fun _ _ m f s => let (a, s') := m s in f a s' ;
-    MonadStateful.op_run := fun _ m s => m s
-  |}
-  |}.
-
-Next Obligation.
-compute.
-reflexivity.
-Qed.
-
-Next Obligation.
-compute.
-intros S A m.
-extensionality s.
-destruct (m s); reflexivity.
-Qed.
-
-Next Obligation.
-compute.
-intros S A B C m f g.
-extensionality s.
-destruct (m s); reflexivity.
-Qed.
-
-Next Obligation.
-reflexivity.
-Qed.
-
-Next Obligation.
-reflexivity.
-Qed.
-
-Example test_stateful : statefulMonadExample unit nat:=
-  do x <- Ret 0 ;
-  Ret x.
-
-Compute Run test_stateful tt.
-
 (* The state monad : a stateful monad with [get] and [put] *)
 
 Module MonadState.
@@ -171,27 +126,6 @@ End MonadState.
 
 Export MonadState.Exports.
 
-(* An example of state monad *)
-
-Program Example stateMonadExample (S : Type) : stateMonad S := {|
-MonadState.class := {|
-  MonadState.base := MonadStateful.class (statefulMonadExample S) ;
-  MonadState.mixin := {|
-    MonadState.get := fun s => (s, s) ;
-    MonadState.put := fun s' _ => (tt, s')
-    |}
-  |}
-|}.
-
-Solve Obligations with reflexivity.
-
-Example nonce : stateMonadExample nat nat :=
-  do n <- Get (M := stateMonadExample _) ;
-  do _ <- Put (M := stateMonadExample _) (S n);
-  Ret n.
-
-Compute Run (do n1 <- nonce ; do n2 <- nonce; Ret (n1 =? n2)) 0.
-
 (* The trace monad : a stateful monad with [mark] *)
 
 Module MonadTrace.
@@ -229,28 +163,6 @@ End Exports.
 End MonadTrace.
 
 Export MonadTrace.Exports.
-
-(* An example of trace monad *)
-
-Program Example traceMonadExample (T : Type) : traceMonad T := {|
-MonadTrace.class := {|
-  MonadTrace.base := MonadStateful.class (statefulMonadExample (list T)) ;
-  MonadTrace.mixin := {|
-    MonadTrace.mark := fun t l => (tt, l ++ [t])
-    |}
-  |}
-|}.
-
-Next Obligation.
-reflexivity.
-Qed.
-
-Example test_trace : traceMonadExample bool nat :=
-  do x <- Ret 0 ;
-  do _ <- Mark (M := traceMonadExample _) true ;
-  Ret x.
-
-Compute Run test_trace [false; false].
 
 (* Algebraic manipulations of functions *)
 (* REMARK 1: Ce sont des fonctions qui réarrangent leur entrée mais ne calculent
@@ -346,21 +258,3 @@ End Exports.
 End MonadStateTrace.
 
 Export MonadStateTrace.Exports.
-
-(* An example of state/trace monad *)
-
-Program Example stateTraceMonadExample (S T : Type) :
-  stateTraceMonad S T := MonadStateTrace.Pack (MonadStateTrace.Class (
-  MonadStateTrace.Mixin
-    _ _ (Sm := stateMonadExample S) (Tm := traceMonadExample T)
-    (st_monad := statefulMonadExample _))).
-
-Solve Obligations with reflexivity.
-
-Example tnonce : stateTraceMonadExample _ nat _ :=
-  do n <- Get (stateTraceMonadExample nat nat);
-  do _ <- Put (stateTraceMonadExample nat nat) (S n);
-  do _ <- Mark (stateTraceMonadExample nat nat) n;
-  Ret n.
-
-Compute Run (do n1 <- tnonce ; do n2 <- tnonce; Ret (n1 =? n2)) (0, []).
