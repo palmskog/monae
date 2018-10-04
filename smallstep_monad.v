@@ -48,7 +48,7 @@ Program Fixpoint denotation {A : Type} (p : program A) : M A :=
   | p_ret _ v => Ret v
   | p_bind _ _ m f => do a <- denotation m; denotation (f a)
   | p_cond _ b p1 p2 => if b then denotation p1 else denotation p2
-  | p_get => Get (Sm := M1) (Tm := M2) (MonadStateTrace.mixin _)
+  | p_get => Get _
   | p_put s' => Put _ s'
   | p_mark t => Mark _ t
   end.
