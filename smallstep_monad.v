@@ -87,11 +87,9 @@ induction p as [ A a | A B p IHp g IHg | A b p1 IHp1 p2 IHp2 | | s0 | t ]; cbn;
  intros s s' l1 l a' Heq.
 - exists [].
   rewrite app_nil_r.
-Admitted.
-(*
-  by move: Heq; rewrite runret => -[].
-- rewrite runbind in Heq.
-  case_eq (Run (denotation p) (s, l1)).
+  by move: Heq; rewrite MonadStateful.runret => -[].
+- rewrite MonadStateful.runbind in Heq.
+  case_eq (Run (M := M0) (denotation p) (s, l1)).
   intros a (s0, l0) Hp.
   rewrite Hp in Heq.
   apply IHp in Hp.
@@ -102,14 +100,17 @@ Admitted.
   rewrite app_assoc.
   congruence.
 - destruct b; [ eapply IHp1 | eapply IHp2 ]; exact Heq.
+- (* Why [Get] is unfolded here?! *)
+  exists [].
+  rewrite app_nil_r.
+Admitted.
+(*
+  by move: Heq; rewrite MonadState.runget => -[].
 - exists [].
   rewrite app_nil_r.
-  by move: Heq; rewrite runget => -[].
-- exists [].
-  rewrite app_nil_r.
-  by move: Heq; rewrite runput => -[].
+  by move: Heq; rewrite MonadState.runput => -[].
 - exists [t].
-  by move: Heq; rewrite runmark => -[].
+  by move: Heq; rewrite MonadState.runmark => -[].
 Qed.
 *)
 
