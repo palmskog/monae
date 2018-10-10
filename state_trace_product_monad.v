@@ -54,6 +54,21 @@ Definition run S (M : t S) A : m M A -> S -> A * S :=
 
 Arguments run {S M A} : simpl never.
 
+Lemma runret (S : Type) (M : t S) (A : Type) (a : A) (s : S) :
+  run (M := M) (ret a) s = (a, s).
+Proof.
+destruct M as [ ? [ ? ? ] ].
+auto.
+Qed.
+
+Lemma runbind
+  (S : Type) (M : t S) (A B : Type) (ma : m M A) (f : A -> m M B) (s : S) :
+  run (bind ma f) s = let: (a'', s'') := run ma s in run (f a'') s''.
+Proof.
+destruct M as [ ? [ ? ? ] ].
+auto.
+Qed.
+
 End MonadStateful.
 
 Module Exports.
