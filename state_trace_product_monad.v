@@ -125,6 +125,13 @@ Arguments op_put {S M} : simpl never.
 
 Definition baseType S (M : t S) := MonadStateful.Pack (base (class M)).
 
+Lemma runget (S : Type) (M : t S) (s : S) :
+  Run (M := baseType M) (op_get : m M _) s = (s, s).
+Proof.
+destruct M as [ ? [ ? [ ? ? ]] ].
+auto.
+Qed.
+
 Module Exports.
 
 Notation Get := op_get.
