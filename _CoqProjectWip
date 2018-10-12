@@ -1,0 +1,20 @@
+-arg "-w -notation-overridden"
+
+ssrZ.v
+monad.v
+state_monad.v
+proba_monad.v
+trace_monad.v
+monad_model.v
+proba_model.v
+example_spark.v
+example_nqueens.v
+example_relabeling.v
+example_monty.v
+smallstep.v
+smallstep_monad.v
+smallstep_examples.v
+wip_mu2017.v
+wip_netys2017.v
+wip_share.v
+-R . monad
