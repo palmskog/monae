@@ -90,7 +90,7 @@ induction y => m.
       by exists y.
     bind_ext; case.
     rewrite fmap_bind.
-    by bind_ext.
+    by rewrite_ fcomp_def.
   rewrite guardsC; last exact: bindmfail.
   rewrite !bindA; bind_ext => s.
   rewrite !bindA guardsC; last exact: bindmfail.
@@ -109,7 +109,8 @@ induction y => m.
   rewrite bindA.
   bind_ext; case.
   bind_ext; case.
-  rewrite /fmap.
+  rewrite {1}fmap_def.
+  rewrite_ fmap_def.
   by rewrite_ bindretf.
 Qed.
 

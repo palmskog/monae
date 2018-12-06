@@ -38,11 +38,12 @@ Lemma lemma_1 a b : let op' a b := op b a in
   foldr op' b (o) insert a = Ret \o foldr op' b \o cons a :> (_ -> M _).
 Proof.
 cbv zeta.
-rewrite -mfoldl_rev rev_insert fcomp_compL compA.
+rewrite -mfoldl_rev rev_insert.
+rewrite fcomp_def compA.
 have opP' : forall (x y : A) (w : seq A), (foldl op b w (.) x) (.) y = (foldl op b w (.) y) (.) x.
   move=> x y w.
   by rewrite opP.
-move: (lemma_35 M opP' a); rewrite {1}/fcomp (* TODO(rei): lemma *) => ->.
+move: (lemma_35 M opP' a); rewrite fcomp_def => ->.
 apply functional_extensionality => s /=.
 by rewrite -cats1 foldl_cat /= /= -foldl_rev.
 Qed.
@@ -53,11 +54,11 @@ Lemma lemma_2 b : let op' a b := op b a in
 Proof.
 move=> op'.
 apply functional_extensionality; elim => [|h t IH].
-  by rewrite fcomp_ext /= fmap_ret.
-rewrite fcomp_ext /= fmap_bind lemma_1.
+  by rewrite fcompE fmap_retE.
+rewrite fcompE /= fmap_bind lemma_1.
 transitivity (do x <- perm t; (Ret \o (fun x => op' h x) \o foldr op' b) x : M _).
   by [].
-by rewrite -(@bind_fmap _ _ _ _ (foldr op' b)) -fcomp_ext IH bindretf.
+by rewrite -(@bind_fmap _ _ _ _ (foldr op' b)) -fcompE IH bindretf.
 Qed.
 
 End foldl_perm_deterministic.
@@ -77,7 +78,7 @@ split => H.
   by rewrite (proj2 H) IH.
 split; [by move/(congr1 (fun x => x [::])) : H | move=> s1 s2].
 rewrite (_ : _ ++ _ = flatten [:: s1; s2]); last by rewrite /= cats0.
-by rewrite compE -H /= addb0.
+by rewrite -(compE h) -H /= addb0.
 Qed.
 
 Lemma lemma_6_foldl (h : seq A -> B) (add0b : left_id b add) :
@@ -94,7 +95,7 @@ split => H.
   by rewrite -addA IH -addA IH.
 split; [by move/(congr1 (fun x => x [::])) : H | move=> s1 s2].
 rewrite (_ : _ ++ _ = flatten [:: s1; s2]); last by rewrite /= cats0.
-by rewrite compE -H /= add0b.
+by rewrite -(compE h) -H /= add0b.
 Qed.
 
 Corollary corollary_10 (add0b : left_id b add) :
@@ -122,7 +123,7 @@ Lemma lemma_11_a s :
 Proof.
 move=> Hadd H1; apply (@Ret_inj M).
 move/(congr1 (fun x => x s)) : H1 => /= <-.
-by rewrite /aggregate fcomp_compL compA /= -fcomp_ext (@lemma_34 M _ _ _ Hadd b).
+by rewrite /aggregate fcomp_def compA /= -fcompE (@lemma_34 M _ _ _ Hadd b).
 Qed.
 
 Lemma lemma_11_b s s' (m : M _) :
@@ -135,9 +136,10 @@ have /esym H : Ret ((foldl mul b \o flatten) s) =
     (foldl add b \o map (foldl mul b)) ($) Ret s' [~]
     (foldl add b \o map (foldl mul b)) ($) m.
   move/(congr1 (fun x => x s)) : H1 => /= <-.
-  by rewrite /aggregate perm_map -fcomp_comp fcomp_ext H2 alt_fmapDl.
+  by rewrite /aggregate perm_map -fcomp_comp fcompE H2 alt_fmapDl.
 apply (@Ret_inj M).
 case: (alt_Ret H) => <- _.
+rewrite -(compE (fmap _)).
 by rewrite fmap_ret.
 Qed.
 
