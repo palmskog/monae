@@ -575,7 +575,7 @@ Program Definition RET (A : finType) (a : A) : F A :=
 
 Next Obligation.
 intros A a.
-unfold convex.
+unfold is_convex_set.
 apply asboolT.
 intros x y p Hxin Hyin.
 rewrite unfold_in.
