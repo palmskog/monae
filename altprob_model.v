@@ -595,6 +595,12 @@ exists (Dist1.d a).
 reflexivity.
 Qed.
 
+Definition set_join {A : Type} (m : set (set A)) : set A :=
+fun a => exists s, s \in m /\ a \in s.
+
+Definition set_bind {A B : Type} (m : set A) (f : A -> set B) : set B :=
+set_join (f @` m).
+
 (* we assume the existence of appropriate BIND and RET *)
 Axiom BIND : forall (A B : finType) (m : F A) (f : A -> F B), F B.
 Axiom BINDretf : relLaws.left_neutral BIND RET.
