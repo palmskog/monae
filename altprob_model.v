@@ -601,8 +601,100 @@ fun a => exists s, s \in m /\ a \in s.
 Definition set_bind {A B : Type} (m : set A) (f : A -> set B) : set B :=
 set_join (f @` m).
 
+Set Bullet Behavior "Strict Subproofs".
+
+Program Definition centroid
+  (s : set R) (Hconvex : is_convex_set s) : R :=
+_.
+Admit Obligations.
+
+Lemma le_0_centroid (s : set R) (Hconvex : is_convex_set s) :
+  (forall r, r \in s -> 0 <= r)%R ->
+  (0 <= centroid Hconvex)%R.
+Proof.
+Admitted.
+
+Lemma Conv_factor : forall (A : finType) (d1 d2 : dist A) (p : prob) (a : A),
+  d1 a <|p|> d2 a = (d1 <|p|> d2) a.
+Proof.
+Admitted.
+
+Program Definition dist_centroid {A : finType} (m : {convex_set dist A}) : dist A :=
+{| pmf := {| pos_f := fun a => @centroid ((fun d => pmf d a) @` m) _ |} |}.
+
+Next Obligation.
+intros A [m Hm] a.
+cbn.
+unfold is_convex_set in *.
+apply asboolT.
+intros x y p Hxin Hyin.
+apply asboolW in Hm.
+apply (introT (imsetP _ _ _)).
+apply (elimT (imsetP _ _ _)) in Hxin.
+apply (elimT (imsetP _ _ _)) in Hyin.
+destruct Hxin as [dx Hxin Heqx].
+destruct Hyin as [dy Hyin Heqy].
+subst x y.
+exists (Conv dx dy p).
+- apply Hm; [ eexact Hxin | eexact Hyin ].
+- apply Conv_factor.
+Qed.
+
+Next Obligation.
+intros A m a.
+cbn.
+apply le_0_centroid.
+intros r Hin.
+apply (elimT (imsetP _ _ _)) in Hin.
+destruct Hin as [d Hin Heq].
+subst r.
+apply dist_ge0.
+Qed.
+
+Next Obligation.
+intros A [m Hm].
+cbn in *.
+Admitted.
+
+Program Definition BIND (A B : finType) (m : F A) (f : A -> F B) : F B :=
+@NECSet.mk _ (@CSet.mk _ (
+  set_bind
+    (CSet.car (NECSet.car m))
+    (fun d => set1 (DistBind.d d (fun a => dist_centroid (NECSet.car (f a)))))) _) _.
+
+Next Obligation.
+intros A B m f.
+cbn.
+unfold is_convex_set, set_bind, set_join.
+apply asboolT.
+cbn.
+intros x y p H1 H2.
+apply asboolT.
+apply asboolW in H1.
+apply asboolW in H2.
+destruct H1 as [s1 [H11 H12]].
+destruct H2 as [s2 [H21 H22]].
+apply asboolW in H11.
+apply asboolW in H12.
+apply asboolW in H21.
+apply asboolW in H22.
+Admitted.
+
+Next Obligation.
+intros A B [m Hm] f.
+cbn in *.
+unfold set_bind, set_join.
+cbn.
+revert Hm.
+rewrite set0P.
+rewrite set0P.
+intros [d Hd].
+eexists.
+eexists.
+split; apply asboolT.
+Admitted.
+
 (* we assume the existence of appropriate BIND and RET *)
-Axiom BIND : forall (A B : finType) (m : F A) (f : A -> F B), F B.
 Axiom BINDretf : relLaws.left_neutral BIND RET.
 Axiom BINDmret : relLaws.right_neutral BIND RET.
 Axiom BINDA : relLaws.associative BIND.
