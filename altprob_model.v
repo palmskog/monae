@@ -567,9 +567,38 @@ Local Obligation Tactic := idtac.
 
 Let F := necset.
 
+
+
+(* N.B. [set1] is the unit of the [set] monad. *)
+Program Definition RET (A : finType) (a : A) : F A :=
+@NECSet.mk _ (@CSet.mk _ (set1 (Dist1.d a)) _) _.
+
+Next Obligation.
+intros A a.
+unfold convex.
+apply asboolT.
+intros x y p Hxin Hyin.
+rewrite unfold_in.
+rewrite unfold_in in Hxin.
+rewrite unfold_in in Hyin.
+cbn in *.
+unfold set1 in *.
+apply asboolW in Hxin.
+apply asboolW in Hyin.
+subst x y.
+apply asboolT, convmm.
+Qed.
+
+Next Obligation.
+intros A a.
+cbn.
+rewrite set0P.
+exists (Dist1.d a).
+reflexivity.
+Qed.
+
 (* we assume the existence of appropriate BIND and RET *)
 Axiom BIND : forall (A B : finType) (m : F A) (f : A -> F B), F B.
-Axiom RET : forall A : finType, A -> F A.
 Axiom BINDretf : relLaws.left_neutral BIND RET.
 Axiom BINDmret : relLaws.right_neutral BIND RET.
 Axiom BINDA : relLaws.associative BIND.
