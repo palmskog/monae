@@ -634,8 +634,6 @@ Local Obligation Tactic := idtac.
 
 Let F := necset.
 
-
-
 (* N.B. [set1] is the unit of the [set] monad. *)
 Program Definition RET (A : finType) (a : A) : F A :=
 @NECSet.mk _ (@CSet.mk _ (set1 (Dist1.d a)) _) _.
