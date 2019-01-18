@@ -614,12 +614,6 @@ Lemma le_0_centroid (s : set R) (Hconvex : is_convex_set s) :
 Proof.
 Admitted.
 
-Lemma Conv_factor : forall (A : finType) (d1 d2 : dist A) (p : prob) (a : A),
-  d1 a <|p|> d2 a = (d1 <|p|> d2) a.
-Proof.
-move=> *; by rewrite Conv2Dist.dE.
-Qed.
-
 Program Definition dist_centroid {A : finType} (m : {convex_set dist A}) : dist A :=
 {| pmf := {| pos_f := fun a => @centroid ((fun d => pmf d a) @` m) _ |} |}.
 
@@ -638,7 +632,7 @@ destruct Hyin as [dy Hyin Heqy].
 subst x y.
 exists (Conv dx dy p).
 - apply Hm; [ eexact Hxin | eexact Hyin ].
-- apply Conv_factor.
+- symmetry; apply Conv2DistdE.
 Qed.
 
 Next Obligation.
