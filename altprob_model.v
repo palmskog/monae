@@ -607,6 +607,17 @@ Definition image2
   (A B C : Type) (f : A -> B -> C) (s1 : set A) (s2 : set B) : set C :=
 set_join (image (fun a => image (f a) s2) s1).
 
+Lemma rsum_Conv (A : finType) (p : prob) (dx dy : dist A):
+\rsum_(a in A) (dx a <|p|> dy a) =
+\rsum_(a in A) dx a <|p|> \rsum_(a in A) dy a.
+Proof.
+Admitted.
+
+Lemma DistBindConv (A B : finType) (p : prob) (dx dy : dist A) (f : A -> dist B) :
+DistBind.d dx f <|p|> DistBind.d dy f = DistBind.d (dx <|p|> dy) f.
+Proof.
+Admitted.
+
 Program Definition centroid
   (s : set R) (Hconvex : is_convex_set s) : R :=
 _.
@@ -694,8 +705,7 @@ rewrite sum_centroid.
       rewrite Conv2DistdE.
       reflexivity.
     }
-    (* Reynald *)
-    admit.
+    apply rsum_Conv.
 - intro Hconvex.
   rewrite (@centroid_eq _ Hconvex (1%R)); [ reflexivity | ].
   intros r Hin.
@@ -703,7 +713,7 @@ rewrite sum_centroid.
   destruct Hin as [d Hin Heq].
   subst r.
   apply pmf1.
-Admitted.
+Qed.
 
 Program Definition BIND (A B : finType) (m : F A) (f : A -> F B) : F B :=
 @NECSet.mk _ (@CSet.mk _ (
@@ -741,10 +751,8 @@ split.
   apply asboolW in H22.
   subst x y.
   apply asboolT.
-  set (d := fun a : A => dist_centroid (NECSet.car (f a))).
-  (* Reynald *)
-  admit.
-Admitted.
+  apply DistBindConv.
+Qed.
 
 Next Obligation.
 intros A B [[m Hm1] Hm2] f.
