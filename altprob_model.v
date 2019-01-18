@@ -603,19 +603,38 @@ set_join (f @` m).
 
 Set Bullet Behavior "Strict Subproofs".
 
+Definition image2
+  (A B C : Type) (f : A -> B -> C) (s1 : set A) (s2 : set B) : set C :=
+set_join (image (fun a => image (f a) s2) s1).
+
 Program Definition centroid
   (s : set R) (Hconvex : is_convex_set s) : R :=
 _.
 Admit Obligations.
 
+Arguments centroid _ _ : clear implicits.
+
 Lemma le_0_centroid (s : set R) (Hconvex : is_convex_set s) :
   (forall r, r \in s -> 0 <= r)%R ->
-  (0 <= centroid Hconvex)%R.
+  (0 <= centroid s Hconvex)%R.
+Proof.
+Admitted.
+
+Lemma centroid_eq : forall (s : set R) (Hconvex : is_convex_set s) (r0 : R),
+  (forall r, r \in s -> r = r0) -> centroid s Hconvex = r0.
+Proof.
+Admitted.
+
+Lemma sum_centroid (A : finType) (m : set (dist A))
+  (Hconvex1 : forall a : A, is_convex_set ((fun d : dist A => d a) @` m))
+  (Hconvex2 : is_convex_set ((fun d : dist A => \rsum_(a in A) d a) @` m)) :
+\rsum_(a | true) centroid ((fun d => pmf d a) @` m) (Hconvex1 a) =
+centroid ((fun d => \rsum_(a in A) pmf d a) @`m) Hconvex2.
 Proof.
 Admitted.
 
 Program Definition dist_centroid {A : finType} (m : {convex_set dist A}) : dist A :=
-{| pmf := {| pos_f := fun a => @centroid ((fun d => pmf d a) @` m) _ |} |}.
+{| pmf := {| pos_f := fun a => centroid ((fun d => pmf d a) @` m) _ |} |}.
 
 Next Obligation.
 intros A [m Hm] a.
@@ -649,6 +668,41 @@ Qed.
 Next Obligation.
 intros A [m Hm].
 cbn in *.
+assert (forall d : dist A, \rsum_(a in A) d a = 1%R).
+{
+  intro d.
+  apply pmf1.
+}
+rewrite sum_centroid.
+- unfold is_convex_set in *.
+  apply asboolT.
+  intros x y p Hxin Hyin.
+  apply (elimT (imsetP _ _ _)) in Hxin.
+  apply (elimT (imsetP _ _ _)) in Hyin.
+  apply (introT (imsetP _ _ _)).
+  destruct Hxin as [dx Hxin Heqx].
+  destruct Hyin as [dy Hyin Heqy].
+  subst x y.
+  exists (dx <|p|> dy).
+  + apply asboolW in Hm.
+    apply Hm; [ exact Hxin | exact Hyin ].
+  + symmetry.
+    etransitivity.
+    {
+      apply f_equal.
+      extensionality a.
+      rewrite Conv2DistdE.
+      reflexivity.
+    }
+    (* Reynald *)
+    admit.
+- intro Hconvex.
+  rewrite (@centroid_eq _ Hconvex (1%R)); [ reflexivity | ].
+  intros r Hin.
+  apply (elimT (imsetP _ _ _)) in Hin.
+  destruct Hin as [d Hin Heq].
+  subst r.
+  apply pmf1.
 Admitted.
 
 Program Definition BIND (A B : finType) (m : F A) (f : A -> F B) : F B :=
@@ -658,36 +712,55 @@ Program Definition BIND (A B : finType) (m : F A) (f : A -> F B) : F B :=
     (fun d => set1 (DistBind.d d (fun a => dist_centroid (NECSet.car (f a)))))) _) _.
 
 Next Obligation.
-intros A B m f.
-cbn.
+intros A B [[m Hm1] Hm2] f.
+unfold is_convex_set in Hm1.
+cbn in *.
+apply asboolW in Hm1.
 unfold is_convex_set, set_bind, set_join.
 apply asboolT.
-cbn.
 intros x y p H1 H2.
 apply asboolT.
 apply asboolW in H1.
 apply asboolW in H2.
 destruct H1 as [s1 [H11 H12]].
 destruct H2 as [s2 [H21 H22]].
-apply asboolW in H11.
-apply asboolW in H12.
-apply asboolW in H21.
-apply asboolW in H22.
+apply (elimT (imsetP _ _ _)) in H11.
+apply (elimT (imsetP _ _ _)) in H21.
+destruct H11 as [dx Hdxin Hdxeq].
+destruct H21 as [dy Hdyin Hdyeq].
+eexists.
+split.
+- apply (introT (imsetP _ _ _)).
+  exists (dx <|p|> dy); [ | reflexivity ].
+  apply Hm1; [ exact Hdxin | exact Hdyin ].
+- unfold set1 in *.
+  cbn.
+  subst s1 s2.
+  cbn in H12, H22.
+  apply asboolW in H12.
+  apply asboolW in H22.
+  subst x y.
+  apply asboolT.
+  set (d := fun a : A => dist_centroid (NECSet.car (f a))).
+  (* Reynald *)
+  admit.
 Admitted.
 
 Next Obligation.
-intros A B [m Hm] f.
+intros A B [[m Hm1] Hm2] f.
 cbn in *.
 unfold set_bind, set_join.
 cbn.
-revert Hm.
-rewrite set0P.
-rewrite set0P.
+revert Hm2.
+do 2 rewrite set0P.
 intros [d Hd].
-eexists.
-eexists.
+exists (DistBind.d d (fun a => dist_centroid (NECSet.car (f a)))).
+exists (set1 (DistBind.d d (fun a => dist_centroid (NECSet.car (f a))))).
 split; apply asboolT.
-Admitted.
+- unfold set1.
+  exists d; [ exact Hd | reflexivity ].
+- reflexivity.
+Qed.
 
 (* we assume the existence of appropriate BIND and RET *)
 Axiom BINDretf : relLaws.left_neutral BIND RET.
