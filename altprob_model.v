@@ -617,7 +617,8 @@ Admitted.
 Lemma Conv_factor : forall (A : finType) (d1 d2 : dist A) (p : prob) (a : A),
   d1 a <|p|> d2 a = (d1 <|p|> d2) a.
 Proof.
-Admitted.
+move=> *; by rewrite Conv2Dist.dE.
+Qed.
 
 Program Definition dist_centroid {A : finType} (m : {convex_set dist A}) : dist A :=
 {| pmf := {| pos_f := fun a => @centroid ((fun d => pmf d a) @` m) _ |} |}.
