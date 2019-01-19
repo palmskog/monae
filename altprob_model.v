@@ -770,8 +770,67 @@ split; apply asboolT.
 - reflexivity.
 Qed.
 
+Require Import JMeq.
+
+Lemma CSet_equal (A : convType) (x y : CSet.t A) :
+  CSet.car x = CSet.car y ->
+  JMeq (CSet.H x) (CSet.H y) ->
+  x = y.
+Proof.
+destruct x as [x Hx].
+destruct y as [y Hy].
+cbn.
+intro Heq1.
+subst y.
+intros Heq2.
+rewrite Heq2.
+reflexivity.
+Qed.
+
+Lemma NECSet_equal (A : finType) (x y : NECSet.t A) :
+  NECSet.car x = NECSet.car y ->
+  JMeq (NECSet.H x) (NECSet.H y) ->
+  x = y.
+Proof.
+destruct x as [x Hx].
+destruct y as [y Hy].
+cbn.
+intro Heq1.
+subst y.
+intros Heq2.
+rewrite Heq2.
+reflexivity.
+Qed.
+
+Lemma dist_left_neutral (A B : finType) (x : A) (f : A -> dist B) :
+  DistBind.d (Dist1.d x) f = f x.
+Proof.
+Admitted.
+
+Lemma set_left_neutral (A B : Type) (x : A) (f : A -> set B) :
+  set_bind (set1 x) f = f x.
+Proof.
+Admitted.
+
+Lemma BINDretf : relLaws.left_neutral BIND RET.
+Proof.
+intros A B a f.
+apply NECSet_equal.
+- apply CSet_equal.
+  + cbn.
+    rewrite set_left_neutral dist_left_neutral.
+    extensionality d.
+    unfold set1.
+    rewrite propeqE.
+    split.
+    * intro Heq.
+      subst d.
+      admit.
+    * intro Hin.
+      (* Ouch! *)
+Admitted.
+
 (* we assume the existence of appropriate BIND and RET *)
-Axiom BINDretf : relLaws.left_neutral BIND RET.
 Axiom BINDmret : relLaws.right_neutral BIND RET.
 Axiom BINDA : relLaws.associative BIND.
 
