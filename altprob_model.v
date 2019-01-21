@@ -566,12 +566,237 @@ Local Obligation Tactic := idtac.
 
 Let F := necset.
 
-(* we assume the existence of appropriate BIND and RET *)
-Axiom BIND : forall (A B : finType) (m : F A) (f : A -> F B), F B.
-Axiom RET : forall A : finType, A -> F A.
-Axiom BINDretf : relLaws.left_neutral BIND RET.
-Axiom BINDmret : relLaws.right_neutral BIND RET.
-Axiom BINDA : relLaws.associative BIND.
+(* N.B. [set1] is the unit of the [set] monad. *)
+Program Definition RET (A : finType) (a : A) : F A :=
+@NECSet.mk _ (@CSet.mk _ (set1 (Dist1.d a)) _) _.
+
+Next Obligation.
+intros A a.
+unfold is_convex_set.
+apply asboolT.
+intros x y p Hxin Hyin.
+rewrite unfold_in.
+rewrite unfold_in in Hxin.
+rewrite unfold_in in Hyin.
+cbn in *.
+unfold set1 in *.
+apply asboolW in Hxin.
+apply asboolW in Hyin.
+subst x y.
+apply asboolT, convmm.
+Qed.
+
+Next Obligation.
+intros A a.
+cbn.
+rewrite set0P.
+exists (Dist1.d a).
+reflexivity.
+Qed.
+
+Definition set_join {A : Type} (m : set (set A)) : set A :=
+fun a => exists s, s \in m /\ a \in s.
+
+Set Bullet Behavior "Strict Subproofs".
+
+Program Definition distribute (A B : Type) (f : A -> set B) : set (A -> B) :=
+fun g => forall a, g a \in f a.
+
+Lemma distribute_set1 (A B : Type) (g : A -> B) :
+  g \in distribute (fun a : A => set1 (g a)).
+Proof.
+unfold distribute.
+apply asboolT.
+intro a.
+unfold set1.
+cbn.
+apply asboolT.
+reflexivity.
+Qed.
+
+Lemma distribute_set1_eq (A B : Type) (g1 g2 : A -> B) :
+  g1 \in distribute (fun a => set1 (g2 a)) -> g1 = g2.
+Proof.
+unfold distribute.
+intro Hin.
+extensionality a.
+apply asboolW in Hin.
+apply asboolW.
+apply Hin.
+Qed.
+
+Lemma distribute_choice (A B : Type) (f : A -> set B) (a : A)
+  (b : B) (Hin : b \in f a) :
+  exists (g : A -> B), g \in distribute f /\ b = g a.
+Proof.
+unfold distribute.
+eexists.
+cbn.
+split.
+- apply asboolT.
+  intro a'.
+  apply asboolT.
+Admitted.
+
+Lemma distribute_at (A B : Type) (f : A -> set B) (a : A)
+  (g : A -> B) (Hin : g \in distribute f) :
+  g a \in f a.
+Proof.
+apply asboolW in Hin.
+apply Hin.
+Qed.
+
+Definition bind
+  (A B : finType) (m : set (dist A)) (f : A -> set (dist B)) :
+  set (dist B) :=
+set_join ((fun d : dist A => DistBind.d d @` distribute f) @` m).
+
+Lemma distribute_bind
+  (A : Type) (B C : finType) (f : A -> set (dist B)) (g : B -> set (dist C))
+  (f' : A -> dist B) (g' : B -> dist C) :
+  f' \in distribute f -> g' \in distribute g -> (fun a => DistBind.d (f' a) g') \in distribute (fun a => bind (f a) g).
+Proof.
+intros Hinf Hing.
+unfold bind, set_join.
+apply asboolT.
+intro a.
+apply asboolT.
+eexists.
+split.
+- apply (introT (imsetP _ _ _)).
+  exists (f' a); [ | reflexivity ].
+  unfold distribute in Hinf.
+  apply asboolW in Hinf.
+  apply Hinf.
+- apply (introT (imsetP _ _ _)).
+  exists g'; [ | reflexivity ].
+  exact Hing.
+Qed.
+
+Program Definition BIND (A B : finType) (m : F A) (f : A -> F B) : F B :=
+@NECSet.mk _ (@CSet.mk _ (bind (NECSet.car m) (fun a => NECSet.car (f a))) _) _.
+Admit Obligations.
+
+Lemma BINDretf : relLaws.left_neutral BIND RET.
+Proof.
+intros A B a f.
+apply val_inj => /=.
+apply val_inj => /=.
+unfold bind, set_join.
+extensionality d.
+rewrite propeqE.
+split.
+- intros (s & Hsin & Hdin).
+  apply (elimT (imsetP _ _ _)) in Hsin.
+  destruct Hsin as (d', Hin, Heq).
+  unfold set1 in Hin.
+  apply asboolW in Hin.
+  subst d' s.
+  apply (elimT (imsetP _ _ _)) in Hdin.
+  destruct Hdin as (g, Hin, Heq).
+  subst d.
+  rewrite DistBind1f.
+  apply asboolW.
+  exact (@distribute_at A (dist B) (fun a => NECSet.car (f a)) a g Hin).
+- intros Hin.
+  exists (DistBind.d (Dist1.d a) @` distribute (fun a0 : A => NECSet.car (f a0))).
+  split.
+  + apply (introT (imsetP _ _ _)).
+    exists (Dist1.d a).
+    * apply asboolT; reflexivity.
+    * reflexivity.
+  + apply (introT (imsetP _ _ _)).
+    apply asboolT in Hin.
+    destruct (@distribute_choice A (dist B) (fun a => NECSet.car (f a)) a d Hin) as (g & Hgin & Heq).
+    exists g; [ exact Hgin | rewrite DistBind1f; exact Heq ].
+Qed.
+
+Lemma BINDmret : relLaws.right_neutral BIND RET.
+Proof.
+intros A m.
+apply val_inj => /=.
+apply val_inj => /=.
+unfold bind, set_join.
+extensionality d.
+rewrite propeqE.
+split.
+- intros (s & Hsin & Hdin).
+  apply (elimT (imsetP _ _ _)) in Hsin.
+  destruct Hsin as (d', Hd'in, Heq).
+  subst s.
+  apply (elimT (imsetP _ _ _)) in Hdin.
+  destruct Hdin as (g, Hgin, Heq).
+  assert (g = @Dist1.d _) by (apply distribute_set1_eq; exact Hgin).
+  subst d g.
+  rewrite DistBindp1.
+  apply asboolW.
+  exact Hd'in.
+- intros Hin.
+  eexists.
+  split.
+  + apply (introT (imsetP _ _ _)).
+    exists d.
+    * apply asboolT.
+      exact Hin.
+    * reflexivity.
+  + apply (introT (imsetP _ _ _)).
+    exists (@Dist1.d _); [ | rewrite DistBindp1; reflexivity ].
+    apply distribute_set1.
+Qed.
+
+Lemma BINDA : relLaws.associative BIND.
+Proof.
+intros A B C m f g.
+apply val_inj => /=.
+apply val_inj => /=.
+extensionality d.
+rewrite propeqE.
+split.
+- intros (s & Hsin & Hdin).
+  apply (elimT (imsetP _ _ _)) in Hsin.
+  destruct Hsin as (d', Hd'in, Heq).
+  subst s.
+  apply (elimT (imsetP _ _ _)) in Hdin.
+  destruct Hdin as (h, Hhin, Heq).
+  subst d.
+  cbn in Hd'in.
+  apply asboolW in Hd'in.
+  destruct Hd'in as (s & Hsin & Hd'in).
+  apply (elimT (imsetP _ _ _)) in Hsin.
+  destruct Hsin as (d, Hdin, Heq).
+  eexists.
+  split.
+  + apply (introT (imsetP _ _ _)).
+    exists d; [ exact Hdin | reflexivity ].
+  + subst s.
+    apply (elimT (imsetP _ _ _)) in Hd'in.
+    destruct Hd'in as (i, Hiin, Heq).
+    apply (introT (imsetP _ _ _)).
+    subst d'.
+    exists (fun a => DistBind.d (i a) h); [ | apply DistBindA ].
+    exact (@distribute_bind A B C (fun a => NECSet.car (f a)) (fun b => NECSet.car (g b)) i h Hiin Hhin).
+- intros (s & Hsin & Hdin).
+  apply (elimT (imsetP _ _ _)) in Hsin.
+  destruct Hsin as (d', Hd'in, Heq).
+  subst s.
+  apply (elimT (imsetP _ _ _)) in Hdin.
+  destruct Hdin as (h, Hhin, Heq).
+  subst d.
+  eexists.
+  split.
+  + apply (introT (imsetP _ _ _)).
+    eexists; [ | reflexivity ].
+    apply asboolT.
+    eexists.
+    eexists.
+    * apply (introT (imsetP _ _ _)).
+      eexists; [ eexact Hd'in | reflexivity ].
+    * apply asboolT.
+      eexists; [ | reflexivity ].
+      admit.
+  + apply asboolT.
+    eexists; [ | rewrite DistBindA ]; admit.
+Admitted.
 
 Program Definition apmonad : relMonad.t := @relMonad.Pack F
   (@relMonad.Class _ (@RET) BIND _ _ _ ).
