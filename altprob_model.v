@@ -606,17 +606,6 @@ Definition image2
   (A B C : Type) (f : A -> B -> C) (s1 : set A) (s2 : set B) : set C :=
 set_join (image (fun a => image (f a) s2) s1).
 
-Lemma rsum_Conv (A : finType) (p : prob) (dx dy : dist A):
-\rsum_(a in A) (dx a <|p|> dy a) =
-\rsum_(a in A) dx a <|p|> \rsum_(a in A) dy a.
-Proof.
-Admitted.
-
-Lemma DistBindConv (A B : finType) (p : prob) (dx dy : dist A) (f : A -> dist B) :
-DistBind.d dx f <|p|> DistBind.d dy f = DistBind.d (dx <|p|> dy) f.
-Proof.
-Admitted.
-
 Program Definition centroid
   (s : set R) (Hconvex : is_convex_set s) : R :=
 _.
@@ -769,64 +758,43 @@ split; apply asboolT.
 - reflexivity.
 Qed.
 
-Require Import JMeq.
-
-Lemma CSet_equal (A : convType) (x y : CSet.t A) :
+(*Lemma CSet_equal (A : convType) (x y : CSet.t A) :
   CSet.car x = CSet.car y ->
-  JMeq (CSet.H x) (CSet.H y) ->
   x = y.
-Proof.
-destruct x as [x Hx].
-destruct y as [y Hy].
-cbn.
-intro Heq1.
-subst y.
-intros Heq2.
-rewrite Heq2.
-reflexivity.
-Qed.
+Proof. move=> xy; exact/val_inj. Qed.
 
 Lemma NECSet_equal (A : finType) (x y : NECSet.t A) :
   NECSet.car x = NECSet.car y ->
-  JMeq (NECSet.H x) (NECSet.H y) ->
   x = y.
-Proof.
-destruct x as [x Hx].
-destruct y as [y Hy].
-cbn.
-intro Heq1.
-subst y.
-intros Heq2.
-rewrite Heq2.
-reflexivity.
-Qed.
+Proof. move=> xy; exact/val_inj. Qed.
 
 Lemma dist_left_neutral (A B : finType) (x : A) (f : A -> dist B) :
   DistBind.d (Dist1.d x) f = f x.
-Proof.
-Admitted.
+Proof. exact: DistBind1f. Qed.*)
 
 Lemma set_left_neutral (A B : Type) (x : A) (f : A -> set B) :
   set_bind (set1 x) f = f x.
 Proof.
-Admitted.
+rewrite predeqE => b; split => [-[s]|fxb]; last first.
+  by exists (f x); split; rewrite in_setE //; exists x.
+by rewrite in_setE => -[[a]]; rewrite /set1 /= => ->{a} <-{s}; rewrite in_setE.
+Qed.
 
 Lemma BINDretf : relLaws.left_neutral BIND RET.
 Proof.
 intros A B a f.
-apply NECSet_equal.
-- apply CSet_equal.
-  + cbn.
-    rewrite set_left_neutral dist_left_neutral.
-    extensionality d.
-    unfold set1.
-    rewrite propeqE.
-    split.
-    * intro Heq.
-      subst d.
-      admit.
-    * intro Hin.
-      (* Ouch! *)
+apply val_inj => /=.
+apply val_inj => /=.
+rewrite set_left_neutral DistBind1f.
+extensionality d.
+unfold set1.
+rewrite propeqE.
+split.
+- intro Heq.
+  subst d.
+  admit.
+- intro Hin.
+  (* Ouch! *)
 Admitted.
 
 (* we assume the existence of appropriate BIND and RET *)
