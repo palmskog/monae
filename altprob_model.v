@@ -686,7 +686,7 @@ split.
       apply asboolT.
       exact Hnonempty.
     }
-    destruct (@distribute_choice A (dist B) (fun a => NECSet.car (f a)) Htotal a d Hin) as (g & Hgin & Heq).
+    destruct (distribute_choice Htotal Hin) as (g & Hgin & Heq).
     exists g; [ exact Hgin | rewrite DistBind1f; exact Heq ].
 Qed.
 
