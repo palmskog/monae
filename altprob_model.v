@@ -549,18 +549,25 @@ apply asboolW.
 apply Hin.
 Qed.
 
-Lemma distribute_choice (A B : Type) (f : A -> set B) (a : A)
-  (b : B) (Hin : b \in f a) :
-  exists (g : A -> B), g \in distribute f /\ b = g a.
+Lemma distribute_choice (A : eqType) (B : Type) (f : A -> set B)
+  (Htotal : is_total (fun a b => b \in f a))
+  (a0 : A) (b0 : B) (Hin : b0 \in f a0) :
+  exists (g : A -> B), g \in distribute f /\ b0 = g a0.
 Proof.
-unfold distribute.
-eexists.
+destruct (IndefiniteDescription.functional_choice _ Htotal) as [g Hg].
+eexists (fun a => if a == a0 then b0 else g a).
 cbn.
 split.
 - apply asboolT.
-  intro a'.
-  apply asboolT.
-Admitted.
+  intro a.
+  case_eq (a == a0).
+  + intro Htrue.
+    rewrite (eqP Htrue).
+    exact Hin.
+  + intros _; apply Hg.
+- rewrite eq_refl.
+  reflexivity.
+Qed.
 
 Lemma distribute_at (A B : Type) (f : A -> set B) (a : A)
   (g : A -> B) (Hin : g \in distribute f) :
@@ -631,7 +638,18 @@ split.
     * reflexivity.
   + apply (introT (imsetP _ _ _)).
     apply asboolT in Hin.
-    destruct (@distribute_choice A (dist B) (fun a => NECSet.car (f a)) a d Hin) as (g & Hgin & Heq).
+    assert (Htotal: is_total (fun a b => b \in NECSet.car (f a))).
+    {
+      intro a0.
+      cbn.
+      generalize (NECSet.H (f a0)).
+      rewrite set0P.
+      intros [d' Hnonempty].
+      exists d'.
+      apply asboolT.
+      exact Hnonempty.
+    }
+    destruct (@distribute_choice A (dist B) (fun a => NECSet.car (f a)) Htotal a d Hin) as (g & Hgin & Heq).
     exists g; [ exact Hgin | rewrite DistBind1f; exact Heq ].
 Qed.
 
