@@ -604,6 +604,43 @@ split.
   exact Hing.
 Qed.
 
+Lemma bind_distribute
+  (A : eqType) (B C : finType) (a0 : A)
+  (f : A -> set (dist B)) (g : B -> set (dist C)) (h' : A -> dist C) :
+  is_total (fun a b => b \in f a) ->
+  h' \in distribute (fun a => bind (f a) g) ->
+  exists (f' : A -> dist B) (g' : B -> dist C),
+    f' \in distribute f /\ g' \in distribute g /\
+    h' a0 = DistBind.d (f' a0) g'.
+Proof.
+intros Hftotal Hh'in.
+apply asboolW in Hh'in.
+specialize (Hh'in a0).
+apply asboolW in Hh'in.
+destruct Hh'in as (s & Hsin & Hh'in).
+apply (elimT (imsetP _ _ _)) in Hsin.
+destruct Hsin as (d, Hdin, Heq).
+subst s.
+apply (elimT (imsetP _ _ _)) in Hh'in.
+destruct Hh'in as (g', Hgin, Heq).
+destruct (IndefiniteDescription.functional_choice _ Hftotal) as [f' Hf].
+exists (fun a => if a == a0 then d else f' a).
+exists g'.
+repeat split; [ | exact Hgin | ].
+- apply asboolT.
+  intro a.
+  case_eq (a == a0).
+  + intro Htrue.
+    rewrite (eqP Htrue).
+    exact Hdin.
+  + intros _.
+    apply Hf.
+- rewrite Heq.
+  f_equal.
+  rewrite eq_refl.
+  reflexivity.
+Qed.
+
 Program Definition BIND (A B : finType) (m : F A) (f : A -> F B) : F B :=
 @NECSet.mk _ (@CSet.mk _ (bind (NECSet.car m) (fun a => NECSet.car (f a))) _) _.
 Admit Obligations.
