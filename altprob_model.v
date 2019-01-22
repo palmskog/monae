@@ -555,7 +555,7 @@ Lemma distribute_choice (A : eqType) (B : Type) (f : A -> set B)
   exists (g : A -> B), g \in distribute f /\ b0 = g a0.
 Proof.
 destruct (IndefiniteDescription.functional_choice _ Htotal) as [g Hg].
-eexists (fun a => if a == a0 then b0 else g a).
+exists (fun a => if a == a0 then b0 else g a).
 cbn.
 split.
 - apply asboolT.
