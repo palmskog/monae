@@ -761,20 +761,58 @@ split.
   apply (elimT (imsetP _ _ _)) in Hdin.
   destruct Hdin as (h, Hhin, Heq).
   subst d.
-  eexists.
-  split.
-  + apply (introT (imsetP _ _ _)).
-    eexists; [ | reflexivity ].
+  assert (Hd'in' : (fun _ : unit => d') \in distribute (fun _ : unit => NECSet.car m)).
+  {
     apply asboolT.
-    eexists.
-    eexists.
-    * apply (introT (imsetP _ _ _)).
-      eexists; [ eexact Hd'in | reflexivity ].
-    * apply asboolT.
-      eexists; [ | reflexivity ].
-      admit.
+    intros [].
+    exact Hd'in.
+  }
+  set (Hin := distribute_bind Hd'in' Hhin).
+  apply asboolW in Hin.
+  clear Hd'in' Hhin.
+  specialize (Hin tt).
+  apply asboolW in Hin.
+  destruct Hin as (s & Hsin).
+  exists s.
+  split; [ | tauto ].
+  destruct Hsin as [Hsin _].
+  apply (elimT (imsetP _ _ _)) in Hsin.
+  destruct Hsin as (d, Hdin, Heq).
+  subst s.
+  apply (introT (imsetP _ _ _)).
+  assert (Hftotal: is_total (fun a b => b \in NECSet.car (f a))).
+  {
+    intro a0.
+    cbn.
+    generalize (NECSet.H (f a0)).
+    rewrite set0P.
+    intros [d'' Hnonempty].
+    exists d''.
+    apply asboolT.
+    exact Hnonempty.
+  }
+  destruct (IndefiniteDescription.functional_choice _ Hftotal) as [f' Hf].
+  eexists (DistBind.d d f').
   + apply asboolT.
-    eexists; [ | rewrite DistBindA ]; admit.
+    eexists.
+    split.
+    * apply (introT (imsetP _ _ _)).
+      exists d; [ | reflexivity ].
+      exact Hdin.
+    * apply (introT (imsetP _ _ _)).
+      eexists; [ | reflexivity ].
+      apply asboolT.
+      exact Hf.
+  + extensionality d''.
+    rewrite propeqE.
+    split.
+    * intro Hd''in.
+      apply asboolT, (elimT (imsetP _ _ _)) in Hd''in.
+      destruct Hd''in as (h', Hh'in, Heq).
+      subst d''.
+      apply asboolW.
+      apply (introT (imsetP _ _ _)).
+      eexists; [ | rewrite DistBindA ].
 Admitted.
 
 Program Definition apmonad : relMonad.t := @relMonad.Pack F
