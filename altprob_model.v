@@ -649,30 +649,31 @@ intros A B m f.
 apply asboolT.
 intros d1 d2 p Hin1 Hin2.
 apply asboolW in Hin1.
-apply asboolW in Hin2.
 destruct Hin1 as (s1 & Hs1in & Hins1).
 apply (elimT (imsetP _ _ _)) in Hs1in.
 destruct Hs1in as (d1', Hd1'in, Heq).
-destruct Hin2 as (s2 & Hs2in & Hins2).
-apply asboolT.
-exists (s1 `|` s2).
 subst s1.
 apply (elimT (imsetP _ _ _)) in Hins1.
-destruct Hins1 as (f', Hf'in, Heq).
+destruct Hins1 as (f1, Hf1in, Heq).
 subst d1.
+apply asboolW in Hin2.
+destruct Hin2 as (s2 & Hs2in & Hins2).
 apply (elimT (imsetP _ _ _)) in Hs2in.
 destruct Hs2in as (d2', Hd2'in, Heq).
 subst s2.
 apply (elimT (imsetP _ _ _)) in Hins2.
-destruct Hins2 as (g', Hg'in, Heq).
+destruct Hins2 as (f2, Hf2in, Heq).
 subst d2.
+apply asboolT.
+eexists.
 split.
 - apply (introT (imsetP _ _ _)).
-  exists (d1' <|p|> d2').
-  + apply (asboolW (CSet.H (NECSet.car m))); [ exact Hd1'in | exact Hd2'in ].
-  + extensionality d.
-    admit.
-- admit.
+  eexists; [ | reflexivity ].
+  admit.
+- apply asboolT.
+  eexists.
+  + admit.
+  + admit. (* Ouch! *)
 Admitted.
 
 Next Obligation.
