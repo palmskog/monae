@@ -491,30 +491,26 @@ Let F := necset.
 
 (* N.B. [set1] is the unit of the [set] monad. *)
 Program Definition RET (A : finType) (a : A) : F A :=
-@NECSet.mk _ (@CSet.mk _ (set1 (Dist1.d a)) _) _.
+  @NECSet.mk _ (@CSet.mk _ [set Dist1.d a] _) _.
 
 Next Obligation.
 intros A a.
 unfold is_convex_set.
 apply asboolT.
 intros x y p Hxin Hyin.
-rewrite unfold_in.
-rewrite unfold_in in Hxin.
-rewrite unfold_in in Hyin.
+rewrite in_setE.
+rewrite in_setE in Hxin.
+rewrite in_setE in Hyin.
 cbn in *.
 unfold set1 in *.
-apply asboolW in Hxin.
-apply asboolW in Hyin.
-subst x y.
-apply asboolT, convmm.
+by rewrite Hxin Hyin convmm.
 Qed.
 
 Next Obligation.
 intros A a.
 cbn.
 rewrite set0P.
-exists (Dist1.d a).
-reflexivity.
+by exists (Dist1.d a).
 Qed.
 
 Definition set_join {A : Type} (m : set (set A)) : set A :=
@@ -529,12 +525,9 @@ Lemma distribute_set1 (A B : Type) (g : A -> B) :
   g \in distribute (fun a : A => set1 (g a)).
 Proof.
 unfold distribute.
-apply asboolT.
+rewrite in_setE.
 intro a.
-unfold set1.
-cbn.
-apply asboolT.
-reflexivity.
+by rewrite in_setE.
 Qed.
 
 Lemma distribute_set1_eq (A B : Type) (g1 g2 : A -> B) :
@@ -543,9 +536,8 @@ Proof.
 unfold distribute.
 intro Hin.
 extensionality a.
-apply asboolW in Hin.
-apply asboolW.
-apply Hin.
+rewrite in_setE in Hin.
+by move: (Hin a); rewrite in_setE.
 Qed.
 
 Lemma distribute_choice (A : eqType) (B : Type) (f : A -> set B)
@@ -557,23 +549,20 @@ destruct (IndefiniteDescription.functional_choice _ Htotal) as [g Hg].
 exists (fun a => if a == a0 then b0 else g a).
 cbn.
 split.
-- apply asboolT.
+- rewrite in_setE.
   intro a.
-  case_eq (a == a0).
-  + intro Htrue.
-    rewrite (eqP Htrue).
-    exact Hin.
+  case: ifPn.
+  + by move/eqP ->.
   + intros _; apply Hg.
-- rewrite eq_refl.
-  reflexivity.
+- by rewrite eqxx.
 Qed.
 
 Lemma distribute_at (A B : Type) (f : A -> set B) (a : A)
   (g : A -> B) (Hin : g \in distribute f) :
   g a \in f a.
 Proof.
-apply asboolW in Hin.
-apply Hin.
+rewrite in_setE in Hin.
+exact: Hin.
 Qed.
 
 Definition bind
@@ -588,16 +577,14 @@ Lemma distribute_bind
 Proof.
 intros Hinf Hing.
 unfold bind, set_join.
-apply asboolT.
+rewrite in_setE.
 intro a.
-apply asboolT.
+rewrite in_setE.
 eexists.
 split.
 - apply (introT (imsetP _ _ _)).
   exists (f' a); [ | reflexivity ].
-  unfold distribute in Hinf.
-  apply asboolW in Hinf.
-  apply Hinf.
+  move: Hinf; rewrite in_setE; exact.
 - apply (introT (imsetP _ _ _)).
   exists g'; [ | reflexivity ].
   exact Hing.
@@ -613,31 +600,25 @@ Lemma bind_distribute
     h' a0 = DistBind.d (f' a0) g'.
 Proof.
 intros Hftotal Hh'in.
-apply asboolW in Hh'in.
+rewrite in_setE in Hh'in.
 specialize (Hh'in a0).
-apply asboolW in Hh'in.
+rewrite in_setE in Hh'in.
 destruct Hh'in as (s & Hsin & Hh'in).
 apply (elimT (imsetP _ _ _)) in Hsin.
 destruct Hsin as (d, Hdin, Heq).
 subst s.
-apply (elimT (imsetP _ _ _)) in Hh'in.
-destruct Hh'in as (g', Hgin, Heq).
+move: Hh'in; rewrite in_setE => -[g']; rewrite -in_setE => Hgin Heq.
 destruct (IndefiniteDescription.functional_choice _ Hftotal) as [f' Hf].
 exists (fun a => if a == a0 then d else f' a).
 exists g'.
 repeat split; [ | exact Hgin | ].
-- apply asboolT.
+- rewrite in_setE.
   intro a.
-  case_eq (a == a0).
-  + intro Htrue.
-    rewrite (eqP Htrue).
-    exact Hdin.
+  case: ifPn.
+  + by move/eqP => ->.
   + intros _.
     apply Hf.
-- rewrite Heq.
-  f_equal.
-  rewrite eq_refl.
-  reflexivity.
+- by rewrite eqxx.
 Qed.
 
 Program Definition BIND (A B : finType) (m : F A) (f : A -> F B) : F B :=
@@ -647,7 +628,7 @@ Next Obligation.
 intros A B m f.
 apply asboolT.
 intros d1 d2 p Hin1 Hin2.
-apply asboolW in Hin1.
+rewrite in_setE in Hin1.
 destruct Hin1 as (s1 & Hs1in & Hins1).
 apply (elimT (imsetP _ _ _)) in Hs1in.
 destruct Hs1in as (d1', Hd1'in, Heq).
@@ -655,7 +636,7 @@ subst s1.
 apply (elimT (imsetP _ _ _)) in Hins1.
 destruct Hins1 as (f1, Hf1in, Heq).
 subst d1.
-apply asboolW in Hin2.
+rewrite in_setE in Hin2.
 destruct Hin2 as (s2 & Hs2in & Hins2).
 apply (elimT (imsetP _ _ _)) in Hs2in.
 destruct Hs2in as (d2', Hd2'in, Heq).
@@ -663,13 +644,13 @@ subst s2.
 apply (elimT (imsetP _ _ _)) in Hins2.
 destruct Hins2 as (f2, Hf2in, Heq).
 subst d2.
-apply asboolT.
+rewrite in_setE.
 eexists.
 split.
-- apply (introT (imsetP _ _ _)).
+- rewrite in_setE.
   eexists; [ | reflexivity ].
   admit.
-- apply asboolT.
+- rewrite in_setE.
   eexists.
   + admit.
   + admit. (* Ouch! *)
@@ -691,23 +672,23 @@ split.
   apply (elimT (imsetP _ _ _)) in Hsin.
   destruct Hsin as (d', Hin, Heq).
   unfold set1 in Hin.
-  apply asboolW in Hin.
+  rewrite in_setE in Hin.
   subst d' s.
   apply (elimT (imsetP _ _ _)) in Hdin.
   destruct Hdin as (g, Hin, Heq).
   subst d.
   rewrite DistBind1f.
-  apply asboolW.
+  rewrite -in_setE.
   exact (@distribute_at A (dist B) (fun a => NECSet.car (f a)) a g Hin).
 - intros Hin.
   exists (DistBind.d (Dist1.d a) @` distribute (fun a0 : A => NECSet.car (f a0))).
   split.
   + apply (introT (imsetP _ _ _)).
     exists (Dist1.d a).
-    * apply asboolT; reflexivity.
+    * by rewrite in_setE.
     * reflexivity.
   + apply (introT (imsetP _ _ _)).
-    apply asboolT in Hin.
+    rewrite -in_setE in Hin.
     assert (Htotal: is_total (fun a b => b \in NECSet.car (f a))).
     {
       intro a0.
@@ -741,15 +722,13 @@ split.
   assert (g = @Dist1.d _) by (apply distribute_set1_eq; exact Hgin).
   subst d g.
   rewrite DistBindp1.
-  apply asboolW.
-  exact Hd'in.
+  by rewrite -in_setE.
 - intros Hin.
   eexists.
   split.
   + apply (introT (imsetP _ _ _)).
     exists d.
-    * apply asboolT.
-      exact Hin.
+    * by rewrite in_setE.
     * reflexivity.
   + apply (introT (imsetP _ _ _)).
     exists (@Dist1.d _); [ | rewrite DistBindp1; reflexivity ].
@@ -772,7 +751,7 @@ split.
   destruct Hdin as (h, Hhin, Heq).
   subst d.
   cbn in Hd'in.
-  apply asboolW in Hd'in.
+  rewrite in_setE in Hd'in.
   destruct Hd'in as (s & Hsin & Hd'in).
   apply (elimT (imsetP _ _ _)) in Hsin.
   destruct Hsin as (d, Hdin, Heq).
@@ -796,7 +775,7 @@ split.
   subst d.
   assert (Hd'in' : (fun _ : unit => d') \in distribute (fun _ : unit => NECSet.car m)).
   {
-    apply asboolT.
+    rewrite in_setE.
     intros [].
     exact Hd'in.
   }
@@ -804,7 +783,7 @@ split.
   apply asboolW in Hin.
   clear Hd'in' Hhin.
   specialize (Hin tt).
-  apply asboolW in Hin.
+  rewrite in_setE in Hin.
   destruct Hin as (s & Hsin).
   exists s.
   split; [ | tauto ].
@@ -812,7 +791,7 @@ split.
   apply (elimT (imsetP _ _ _)) in Hsin.
   destruct Hsin as (d, Hdin, Heq).
   subst s.
-  apply (introT (imsetP _ _ _)).
+  rewrite in_setE.
   assert (Hftotal: is_total (fun a b => b \in NECSet.car (f a))).
   {
     intro a0.
@@ -826,16 +805,14 @@ split.
   }
   destruct (IndefiniteDescription.functional_choice _ Hftotal) as [f' Hf].
   eexists (DistBind.d d f').
-  + apply asboolT.
-    eexists.
+  + eexists.
     split.
-    * apply (introT (imsetP _ _ _)).
+    * rewrite in_setE.
       exists d; [ | reflexivity ].
-      exact Hdin.
-    * apply (introT (imsetP _ _ _)).
+      by rewrite -in_setE.
+    * rewrite in_setE.
       eexists; [ | reflexivity ].
-      apply asboolT.
-      exact Hf.
+      exact: Hf.
   + extensionality d''.
     rewrite propeqE.
     split.
