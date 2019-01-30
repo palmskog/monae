@@ -21,6 +21,13 @@ Local Open Scope proba_scope.
 Local Open Scope classical_set_scope.
 Local Open Scope reals_ext_scope.
 
+Section PR_to_classical_sets.
+
+Definition set_join {A : Type} (m : set (set A)) : set A :=
+  fun a => exists s, s \in m /\ a \in s.
+
+End PR_to_classical_sets.
+
 (* NB: generalization in progress *)
 Section convex_set_of_distributions_prop.
 Variable A : finType.
@@ -482,6 +489,13 @@ End necset_prop.
 
 Require Import relmonad.
 
+(* NB: to appear in infotheo *)
+Lemma is_convex_set1 (A : convType) (a : A) : is_convex_set [set a].
+Proof.
+apply/asboolP => x y p; rewrite 2!in_setE /= => -> ->.
+by rewrite convmm in_setE.
+Qed.
+
 Module ModelAltProb.
 Section modelaltprob.
 
@@ -491,30 +505,13 @@ Let F := necset.
 
 (* N.B. [set1] is the unit of the [set] monad. *)
 Program Definition RET (A : finType) (a : A) : F A :=
-  @NECSet.mk _ (@CSet.mk _ [set Dist1.d a] _) _.
-
-Next Obligation.
-intros A a.
-unfold is_convex_set.
-apply asboolT.
-intros x y p Hxin Hyin.
-rewrite in_setE.
-rewrite in_setE in Hxin.
-rewrite in_setE in Hyin.
-cbn in *.
-unfold set1 in *.
-by rewrite Hxin Hyin convmm.
-Qed.
-
+  @NECSet.mk _ (CSet.mk (is_convex_set1 (Dist1.d a))) _.
 Next Obligation.
 intros A a.
 cbn.
 rewrite set0P.
 by exists (Dist1.d a).
 Qed.
-
-Definition set_join {A : Type} (m : set (set A)) : set A :=
-fun a => exists s, s \in m /\ a \in s.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -582,12 +579,12 @@ intro a.
 rewrite in_setE.
 eexists.
 split.
-- apply (introT (imsetP _ _ _)).
+- rewrite in_setE.
   exists (f' a); [ | reflexivity ].
-  move: Hinf; rewrite in_setE; exact.
-- apply (introT (imsetP _ _ _)).
+  rewrite -in_setE; move: Hinf; rewrite in_setE; exact.
+- rewrite in_setE.
   exists g'; [ | reflexivity ].
-  exact Hing.
+  by rewrite -in_setE.
 Qed.
 
 Lemma bind_distribute
@@ -599,13 +596,12 @@ Lemma bind_distribute
     f' \in distribute f /\ g' \in distribute g /\
     h' a0 = DistBind.d (f' a0) g'.
 Proof.
-intros Hftotal Hh'in.
-rewrite in_setE in Hh'in.
+intros Hftotal.
+rewrite in_setE => Hh'in.
 specialize (Hh'in a0).
-rewrite in_setE in Hh'in.
-destruct Hh'in as (s & Hsin & Hh'in).
-apply (elimT (imsetP _ _ _)) in Hsin.
-destruct Hsin as (d, Hdin, Heq).
+move: Hh'in; rewrite in_setE => -[s [Hsin Hh'in]].
+move: Hsin; rewrite in_setE => -[d Hdin Heq].
+rewrite -in_setE in Hdin.
 subst s.
 move: Hh'in; rewrite in_setE => -[g']; rewrite -in_setE => Hgin Heq.
 destruct (IndefiniteDescription.functional_choice _ Hftotal) as [f' Hf].
@@ -628,21 +624,15 @@ Next Obligation.
 intros A B m f.
 apply asboolT.
 intros d1 d2 p Hin1 Hin2.
-rewrite in_setE in Hin1.
-destruct Hin1 as (s1 & Hs1in & Hins1).
-apply (elimT (imsetP _ _ _)) in Hs1in.
-destruct Hs1in as (d1', Hd1'in, Heq).
+move: Hin1; rewrite in_setE => -[s1 [Hs1in Hins1]].
+move: Hs1in; rewrite in_setE => -[d1' Hd1'in Heq].
 subst s1.
-apply (elimT (imsetP _ _ _)) in Hins1.
-destruct Hins1 as (f1, Hf1in, Heq).
+move: Hins1; rewrite in_setE => -[f1 Hf1in Heq].
 subst d1.
-rewrite in_setE in Hin2.
-destruct Hin2 as (s2 & Hs2in & Hins2).
-apply (elimT (imsetP _ _ _)) in Hs2in.
-destruct Hs2in as (d2', Hd2'in, Heq).
+move: Hin2; rewrite in_setE => -[s2 [Hs2in Hins2]].
+move: Hs2in; rewrite in_setE => -[d2' Hd2'in Heq].
 subst s2.
-apply (elimT (imsetP _ _ _)) in Hins2.
-destruct Hins2 as (f2, Hf2in, Heq).
+move: Hins2; rewrite in_setE => -[f2 Hf2in Heq].
 subst d2.
 rewrite in_setE.
 eexists.
@@ -669,13 +659,11 @@ extensionality d.
 rewrite propeqE.
 split.
 - intros (s & Hsin & Hdin).
-  apply (elimT (imsetP _ _ _)) in Hsin.
-  destruct Hsin as (d', Hin, Heq).
+  move: Hsin; rewrite in_setE => -[d' Hin Heq].
   unfold set1 in Hin.
-  rewrite in_setE in Hin.
   subst d' s.
-  apply (elimT (imsetP _ _ _)) in Hdin.
-  destruct Hdin as (g, Hin, Heq).
+  move: Hdin; rewrite in_setE => -[g Hin Heq].
+  rewrite -in_setE in Hin.
   subst d.
   rewrite DistBind1f.
   rewrite -in_setE.
@@ -683,11 +671,11 @@ split.
 - intros Hin.
   exists (DistBind.d (Dist1.d a) @` distribute (fun a0 : A => NECSet.car (f a0))).
   split.
-  + apply (introT (imsetP _ _ _)).
+  + rewrite in_setE.
     exists (Dist1.d a).
-    * by rewrite in_setE.
+    * done.
     * reflexivity.
-  + apply (introT (imsetP _ _ _)).
+  + rewrite in_setE.
     rewrite -in_setE in Hin.
     assert (Htotal: is_total (fun a b => b \in NECSet.car (f a))).
     {
@@ -701,7 +689,8 @@ split.
       exact Hnonempty.
     }
     destruct (distribute_choice Htotal Hin) as (g & Hgin & Heq).
-    exists g; [ exact Hgin | rewrite DistBind1f; exact Heq ].
+    rewrite in_setE in Hgin.
+    exists g; [ exact Hgin | rewrite DistBind1f; exact (esym Heq) ].
 Qed.
 
 Lemma BINDmret : relLaws.right_neutral BIND RET.
@@ -714,24 +703,23 @@ extensionality d.
 rewrite propeqE.
 split.
 - intros (s & Hsin & Hdin).
-  apply (elimT (imsetP _ _ _)) in Hsin.
-  destruct Hsin as (d', Hd'in, Heq).
+  move: Hsin; rewrite in_setE => -[d' Hd'in Heq].
   subst s.
-  apply (elimT (imsetP _ _ _)) in Hdin.
-  destruct Hdin as (g, Hgin, Heq).
+  move: Hdin; rewrite in_setE => -[g Hgin Heq].
+  rewrite -in_setE in Hgin.
   assert (g = @Dist1.d _) by (apply distribute_set1_eq; exact Hgin).
   subst d g.
-  rewrite DistBindp1.
-  by rewrite -in_setE.
+  by rewrite DistBindp1.
 - intros Hin.
   eexists.
   split.
-  + apply (introT (imsetP _ _ _)).
+  + rewrite in_setE.
     exists d.
-    * by rewrite in_setE.
+    * assumption.
     * reflexivity.
-  + apply (introT (imsetP _ _ _)).
+  + rewrite in_setE.
     exists (@Dist1.d _); [ | rewrite DistBindp1; reflexivity ].
+    rewrite -in_setE.
     apply distribute_set1.
 Qed.
 
@@ -744,52 +732,48 @@ extensionality d.
 rewrite propeqE.
 split.
 - intros (s & Hsin & Hdin).
-  apply (elimT (imsetP _ _ _)) in Hsin.
-  destruct Hsin as (d', Hd'in, Heq).
+  move: Hsin; rewrite in_setE => -[d' Hd'in Heq].
   subst s.
-  apply (elimT (imsetP _ _ _)) in Hdin.
-  destruct Hdin as (h, Hhin, Heq).
+  move: Hdin; rewrite in_setE => -[h Hhin Heq].
   subst d.
   cbn in Hd'in.
-  rewrite in_setE in Hd'in.
   destruct Hd'in as (s & Hsin & Hd'in).
-  apply (elimT (imsetP _ _ _)) in Hsin.
-  destruct Hsin as (d, Hdin, Heq).
+  move: Hsin; rewrite in_setE => -[d Hdin Heq].
   eexists.
   split.
-  + apply (introT (imsetP _ _ _)).
+  + rewrite in_setE.
     exists d; [ exact Hdin | reflexivity ].
   + subst s.
-    apply (elimT (imsetP _ _ _)) in Hd'in.
-    destruct Hd'in as (i, Hiin, Heq).
-    apply (introT (imsetP _ _ _)).
+    move: Hd'in; rewrite in_setE => -[i Hiin Heq].
+    rewrite in_setE.
     subst d'.
-    exists (fun a => DistBind.d (i a) h); [ | apply DistBindA ].
+    exists (fun a => DistBind.d (i a) h); [ | by rewrite DistBindA ].
+    rewrite -in_setE in Hiin.
+    rewrite -in_setE in Hhin.
+    rewrite -in_setE.
     exact (@distribute_bind A B C (fun a => NECSet.car (f a)) (fun b => NECSet.car (g b)) i h Hiin Hhin).
 - intros (s & Hsin & Hdin).
-  apply (elimT (imsetP _ _ _)) in Hsin.
-  destruct Hsin as (d', Hd'in, Heq).
+  move: Hsin; rewrite in_setE => -[d' Hd'in Heq].
   subst s.
-  apply (elimT (imsetP _ _ _)) in Hdin.
-  destruct Hdin as (h, Hhin, Heq).
+  move: Hdin; rewrite in_setE => -[h Hhin Heq].
   subst d.
+  rewrite -in_setE in Hd'in.
   assert (Hd'in' : (fun _ : unit => d') \in distribute (fun _ : unit => NECSet.car m)).
   {
     rewrite in_setE.
     intros [].
     exact Hd'in.
   }
+  rewrite -in_setE in Hhin.
   set (Hin := distribute_bind Hd'in' Hhin).
   apply asboolW in Hin.
   clear Hd'in' Hhin.
   specialize (Hin tt).
-  rewrite in_setE in Hin.
-  destruct Hin as (s & Hsin).
+  move: Hin; rewrite in_setE => -[s Hsin].
   exists s.
   split; [ | tauto ].
   destruct Hsin as [Hsin _].
-  apply (elimT (imsetP _ _ _)) in Hsin.
-  destruct Hsin as (d, Hdin, Heq).
+  move: Hsin; rewrite in_setE => -[d Hdin Heq].
   subst s.
   rewrite in_setE.
   assert (Hftotal: is_total (fun a b => b \in NECSet.car (f a))).
@@ -809,19 +793,17 @@ split.
     split.
     * rewrite in_setE.
       exists d; [ | reflexivity ].
-      by rewrite -in_setE.
+      by [].
     * rewrite in_setE.
       eexists; [ | reflexivity ].
       exact: Hf.
   + extensionality d''.
     rewrite propeqE.
     split.
-    * intro Hd''in.
-      apply asboolT, (elimT (imsetP _ _ _)) in Hd''in.
-      destruct Hd''in as (h', Hh'in, Heq).
+    * move=> -[h' Hh'in Heq].
       subst d''.
       apply asboolW.
-      apply (introT (imsetP _ _ _)).
+      rewrite in_setE.
       eexists; [ | rewrite DistBindA ].
 Admitted.
 
