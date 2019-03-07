@@ -1,6 +1,6 @@
+Require Import Reals Lra Nsatz FunctionalExtensionality.
 From mathcomp Require Import ssreflect ssrbool ssrnat eqtype ssrfun seq choice
   path finset finfun fintype bigop bigenough finmap.
-Require Import Reals Lra Nsatz FunctionalExtensionality.
 From infotheo Require Import ssrR Reals_ext logb ssr_ext ssralg_ext bigop_ext
   Rbigop proba dist.
 
@@ -55,7 +55,9 @@ foldr
 Definition dist_fset {A : choiceType} (d : {Dist A}) : {fset (A*R)} :=
 fset_map (fun x => (x, d x)) (finsupp d).
 
-Program Definition fset_dist {A : choiceType} (s : {fset (A*R)}) : {Dist A} :=
+Program Definition fset_dist {A : choiceType} (s : {fset (A*R)}) 
+  (*H : all (fun ap => 0 <b= ap.2)%R s && \rsum_(ap <- s) ap.2 == 1*) :
+  {Dist A} :=
 _.
 
 Next Obligation.
