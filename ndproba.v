@@ -20,9 +20,11 @@ Definition fset_map {A B : choiceType}
   (f : A -> B) (s : {fset A}) : {fset B} :=
 f @` s.
 
+(*
 Definition fset_map_dep {A B : choiceType}
   (s : {fset A}) (f : forall (x : A), x \in s -> B) : {fset B}.
 Admitted.
+*)
 
 Definition fset_join {A : choiceType}
   (s : {fset {fset A}}) : {fset A} :=
@@ -39,38 +41,34 @@ Definition fset_strength {A B : choiceType}
   (s : {fset A}) (y : B) : {fset (A * B)} :=
 fset_map (fun x => (x, y)) s.
 
+Definition join_map {A B : choiceType}
+  (f : A -> {fset B}) (s : {fset A}) : {fset B} :=
+fset_join (fset_map f s).
+
 Definition fset_cartesian {A : choiceType} (s : {fset {fset A}}) :
-  ssrnat.iter #|` s | (fun B : choiceType => prod_choiceType B A) A.
-Admitted.
+  {fset {fset A}} :=
+foldr
+  (fun xs xss =>
+    join_map (fun x => fset_map (fun l => x |` l) xss) xs)
+  [fset fset0] s.
 
 Definition dist_fset {A : choiceType} (d : {Dist A}) : {fset (A*R)} :=
 fset_map (fun x => (x, d x)) (finsupp d).
 
-Definition fset_dist_fun {A : choiceType} (s : {fset (A*R)}) :
-  {fsfun A -> R for (fun=>0)}.
-Admitted.
-
-Program Definition fset_dist {A : choiceType} (s : {fset (A*R)})
-  (H : all (fun ap => 0 <b= ap.2)%R s && \rsum_(p <- fset_map snd s) p == 1) :
-  {Dist A} :=
-Dist.mk (f := fset_dist_fun s) _.
+Program Definition fset_dist {A : choiceType} (s : {fset (A*R)}) : {Dist A} :=
+_.
 
 Next Obligation.
 intros.
 Admitted.
 
-Definition swap_fun {A : choiceType}
-  (d : {Dist {fset A}}) : {fset {fsfun A -> R for (fun=>0)}} :=
-fset_map fset_dist_fun
-  (fset_map (fun sp => fset_strength sp.1 sp.2) (dist_fset d)).
+Definition swap_fset {A : choiceType}
+  (d : {fset ({fset A}*R)}) : {fset {fset (A*R)}} :=
+fset_cartesian (fset_map (fun sp => fset_map (fun x => (x, sp.2)) sp.1) d).
 
 Program Definition swap {A : choiceType}
   (d : {Dist {fset A}}) : {fset {Dist A}} :=
-fset_map_dep (swap_fun d) (fun f H => Dist.mk (f := f) _).
-
-Next Obligation.
-intros.
-Admitted.
+fset_map fset_dist (swap_fset (dist_fset d)).
 
 Definition ret {A : choiceType} (a : A) : {fset {Dist A}} :=
   [fset (Dist1.d a)].
