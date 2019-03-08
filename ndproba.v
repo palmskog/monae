@@ -58,10 +58,12 @@ fset_map (fun x => (x, d x)) (finsupp d).
 Program Definition fset_dist {A : choiceType} (s : {fset (A*R)}) 
   (*H : all (fun ap => 0 <b= ap.2)%R s && \rsum_(ap <- s) ap.2 == 1*) :
   {Dist A} :=
-_.
+Dist.mk
+  (f := @fsfun_of_ffun tt A R_eqType (fset_map fst s)
+    (fun xH : _ => let (x, _) := xH in
+     nth 0%R (fset_map snd s) (find (fun xp => xp.1 == x) s)) (fun _ => 0%R)) _.
 
 Next Obligation.
-intros.
 Admitted.
 
 Definition swap_fset {A : choiceType}
