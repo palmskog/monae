@@ -1,10 +1,14 @@
-Require Import Reals Lra Nsatz FunctionalExtensionality.
-From mathcomp Require Import ssreflect ssrbool ssrnat eqtype ssrfun seq choice
-  path finset finfun fintype bigop bigenough finmap.
-From infotheo Require Import ssrR Reals_ext logb ssr_ext ssralg_ext bigop_ext
-  Rbigop proba dist.
+From mathcomp
+Require Import ssreflect ssrbool ssrnat eqtype ssrfun seq.
+From mathcomp
+Require Import choice path finset finfun fintype bigop.
+From mathcomp
+Require Import bigenough.
+From mathcomp Require Import finmap.
+Require Import Reals.
+From infotheo Require Import ssrR proba dist.
 
-Local Open Scope fset.
+Local Open Scope fset_scope.
 
 Obligation Tactic := idtac.
 
@@ -69,6 +73,20 @@ Admitted.
 Definition swap_fset {A : choiceType}
   (d : {fset ({fset A}*R)}) : {fset {fset (A*R)}} :=
 fset_cartesian (fset_map (fun sp => fset_map (fun x => (x, sp.2)) sp.1) d).
+
+Check
+swap_fset
+  ((0 |` (1 |` (2 |` fset0)), (1/3 : R_choiceType)%R) |`
+  ((1 |` (3 |` fset0),        (2/3 : R_choiceType)%R) |`
+  fset0)).
+Check
+   ((1, (1/3)%R) |` ((2, (2/3)%R) |` fset0)) |`
+  (((1, (1/3)%R) |` ((4, (2/3)%R) |` fset0)) |`
+  (((2, (1/3)%R) |` ((2, (2/3)%R) |` fset0)) |`
+  (((2, (1/3)%R) |` ((4, (2/3)%R) |` fset0)) |`
+  (((3, (1/3)%R) |` ((2, (2/3)%R) |` fset0)) |`
+  (((3, (1/3)%R) |` ((4, (2/3)%R) |` fset0)) |`
+  fset0))))).
 
 Program Definition swap {A : choiceType}
   (d : {Dist {fset A}}) : {fset {Dist A}} :=
