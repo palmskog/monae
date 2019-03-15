@@ -6,7 +6,7 @@ From mathcomp
 Require Import bigenough.
 From mathcomp Require Import finmap.
 Require Import FunctionalExtensionality Reals.
-From infotheo Require Import ssrR proba dist.
+From infotheo Require Import ssrR Rbigop proba dist.
 
 Local Open Scope fset_scope.
 
@@ -24,18 +24,43 @@ Definition fset_map {A B : choiceType}
   (f : A -> B) (s : {fset A}) : {fset B} :=
 f @` s.
 
+Lemma in_seq_head
+  (A : choiceType) (a : A) (s : seq A) (i : canonical_keys (K:=A) (a :: s)) :
+  a \in mkFinSet (K:=A) (enum_fset:=a :: s) i.
+Proof.
+Admitted.
+
+Definition tail_canonical_keys {A : choiceType} {a : A} {s : seq A}
+  (i : canonical_keys (K:=A) (a :: s)) : canonical_keys (K:=A) s.
+Admitted.
+
+Lemma in_seq_tail (A : choiceType) (a a' : A) (s : seq A)
+  (i : canonical_keys (K:=A) (a' :: s)) :
+  a \in mkFinSet (K:=A) (enum_fset:=s) (tail_canonical_keys i) ->
+  a \in mkFinSet (K:=A) (enum_fset:=a' :: s) i.
+Proof.
+Admitted.
+
+Program
+Definition fset_map_dep {A B : choiceType}
+  (s : {fset A}) (f : forall (x : A), x \in s -> B) : {fset B} :=
+_.
+Next Obligation.
+intros A B [s' i].
+revert s' i.
+induction s' as [ | a s'' IH ]; intros i f.
+- exact fset0.
+- refine (
+    (f a (in_seq_head A a s'' i)) |`
+     IH (tail_canonical_keys i) (fun a Hin => f a (in_seq_tail _ _ _ _ _ Hin))).
+Defined.
+
 Lemma fset_map_map {A B C : choiceType} (f : A -> B) (g : B -> C)
   (s : {fset A}) :
   fset_map g (fset_map f s) = fset_map (fun a => g (f a)) s.
 Proof.
 unfold fset_map.
 Admitted.
-
-(*
-Definition fset_map_dep {A B : choiceType}
-  (s : {fset A}) (f : forall (x : A), x \in s -> B) : {fset B}.
-Admitted.
-*)
 
 Definition fset_join {A : choiceType}
   (s : {fset {fset A}}) : {fset A} :=
@@ -72,7 +97,7 @@ Proof.
 Admitted.
 
 Program Definition fset_dist {A : choiceType} (s : {fset (A*R)}) 
-  (*H : all (fun ap => 0 <b= ap.2)%R s && \rsum_(ap <- s) ap.2 == 1*) :
+  (H : all (fun ap => 0 <b= ap.2)%R s && \rsum_(ap <- s) ap.2 == 1%R) :
   {Dist A} :=
 Dist.mk
   (f := @fsfun_of_ffun tt A R_eqType (fset_map fst s)
@@ -83,7 +108,7 @@ Next Obligation.
 Admitted.
 
 Lemma fset_dist_ret {A : choiceType} (a : A) :
-fset_dist [fset (a, 1%R)] = Dist1.d a.
+forall H, fset_dist [fset (a, 1%R)] H = Dist1.d a.
 Proof.
 Admitted.
 
@@ -108,7 +133,10 @@ Admitted.
 
 Program Definition swap {A : choiceType}
   (d : {Dist {fset A}}) : {fset {Dist A}} :=
-fset_map fset_dist (swap_fset (dist_fset d)).
+fset_map_dep (swap_fset (dist_fset d)) (fun s Hin => fset_dist s _).
+Next Obligation.
+intros.
+Admitted.
 
 Definition prod {A : choiceType} (d : {Dist {fset {Dist A}}}) :
   {fset {Dist A}} :=
@@ -132,6 +160,7 @@ Lemma swap_ret (A : choiceType) (s : {fset A}) :
   swap (Dist1.d s) = fset_map (Dist1.d (A := A)) s.
 Proof.
 unfold swap.
+(*
 rewrite dist_fset_ret.
 rewrite swap_fset_ret.
 rewrite fset_map_map.
@@ -139,6 +168,8 @@ f_equal.
 extensionality a.
 apply fset_dist_ret.
 Qed.
+*)
+Admitted.
 
 Lemma swap_map_ret {A : choiceType} (d : {Dist A}):
   swap (dist_map fset_ret d) = fset_ret d.
