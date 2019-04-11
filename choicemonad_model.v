@@ -1,7 +1,7 @@
 Require Import FunctionalExtensionality Reals.
 Require Import ssreflect ssrmatching ssrfun ssrbool.
 From mathcomp Require Import eqtype ssrnat seq choice fintype tuple finfun.
-From mathcomp Require Import finmap set.
+From mathcomp Require Import finmap set bigop finset.
 
 From infotheo Require Import Reals_ext ssr_ext dist.
 Require Import choicemonad.
@@ -16,24 +16,36 @@ Unset Printing Implicit Defensive.
   - for the probability monad
 *)
 
+Section PR.
+Local Open Scope fset_scope.
+Section ImfsetTh.
+Variables (key : unit) (K V : choiceType).
+Variable (f : K -> V).
+Lemma imfset_set1 x : f @` [fset x] = [fset f x].
+Proof.
+apply/fsetP => y.
+by apply/imfsetP/fset1P=> [[x' /fset1P-> //]| ->]; exists x; rewrite ?fset11.
+Qed.
+End ImfsetTh.
+Section BigOps.
+(*
+Variables (R : Type) (idx : R).
+Variables (op : Monoid.law idx) (aop : Monoid.com_law idx).
+Variables I J : finType.
+Variable A B : {set I}.
+Lemma big_in_fset1 (a : I) (F : I -> R) :
+  \big[op/idx]_(i in [fset a]) F i = F a.
+Proof. by apply: big_pred1 => i; rewrite inE in_fset1. Qed.
+*)
+End BigOps.
+End PR.
+
 Module ModelBacktrackableState.
 Local Open Scope fset_scope.
 
 Section monad.
 Variable S : finType.
 Local Obligation Tactic := try by [].
-
-(*
-Toplevel input, characters 29-67:
-> Check (@choiceMonad.Class _ (fun A (a : A) (s : S) => [fset (a, s)]) (* ret *) (fun A B m (f : A -> S -> {fset (B * S)}) =>      fun s => \bigcup_(i in (fun x => f x.1 x.2) @` (m s)) i) (* bind *) _ _ _) .
->                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The type of this term is a product while it is expected to be
- (Choice.sort (?m A)).
- *)
-
-(*S -> {fset (A * S)}
- (Choice.sort (?m A)).
-*)
 
 Program Definition _monad : choicemonad := @choiceMonad.Pack _
 (@choiceMonad.Class (fun A : choiceType => [choiceType of {ffun S -> {fset (A * S)}}])
@@ -42,16 +54,26 @@ Program Definition _monad : choicemonad := @choiceMonad.Pack _
      [ffun s => \bigcup_(i <- (fun x => f x.1 x.2) @` (m s)) i]) (* bind *)
 _ _ _).
 Next Obligation.
-move=> A B /= m f.
-apply/ffunP => s. 
-rewrite ffunE.
-From mathcomp Require Import finset.
-rewrite big_fset1.
-move=> A B /= m f; extensionality s; by rewrite imset_set1 /= big_set1.
+by move=> A B /= m f; apply/ffunP=> s;
+ rewrite 2!ffunE imfset_set1 /= big_seq_fset1.
 Qed.
 Next Obligation.
-move=> A B /=; extensionality s.
-apply/setP => /= x; apply/bigcupP; case: ifPn => xBs.
+move=> A B /=; apply/ffunP=> s.
+apply/bigfcupsP.
+
+
+bigcupP
+   forall (T I : finType) (x : T) (P : pred I) (F : I -> {set T}),
+   reflect (exists2 i : I, P i & x \in F i)
+     (x \in (\bigcup_(i | P i) F i)%SET)
+bigcupsP
+   forall (T I : finType) (U : pred T) (P : pred I) (F : I -> {set T}),
+   reflect (forall i : I, P i -> F i \subset U)
+     ((\bigcup_(i | P i) F i)%SET \subset U)
+
+
+
+apply/fsetP => /= x; apply/bigcupP; case: ifPn => xBs.
   exists [set x]; by [apply/imsetP; exists x | rewrite inE].
 case => /= SA /imsetP[] /= sa saBs ->{SA}; rewrite inE => /eqP Hx.
 move: xBs; rewrite Hx; apply/negP; rewrite negbK; by case: sa saBs Hx.
