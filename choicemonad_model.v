@@ -1,7 +1,8 @@
 Require Import FunctionalExtensionality Reals.
 Require Import ssreflect ssrmatching ssrfun ssrbool.
 From mathcomp Require Import eqtype ssrnat seq choice fintype tuple finfun.
-From mathcomp Require Import finmap set bigop finset.
+From mathcomp Require Import finmap (* set *) bigop.
+From mathcomp Require Import finset boolp.
 
 From infotheo Require Import Reals_ext ssr_ext dist.
 Require Import choicemonad.
@@ -15,6 +16,21 @@ Unset Printing Implicit Defensive.
   - for the nondeterministic-state monad TODO
   - for the probability monad
 *)
+
+Section axioms.
+Section fun_choiceType.
+Definition fun_eqMixin (T1 T2 : eqType) : Equality.mixin_of (T1 -> T2).
+Proof.
+apply: (@Equality.Mixin _ (fun f g : T1 -> T2 => `[< f =1 g >])) => f g.
+apply: (iffP idP) => [/asboolP|->]; [exact/funext|exact/asboolP].
+Qed.
+Canonical fun_eqType (T1 T2 : eqType) :=
+  Eval hnf in EqType (T1 -> T2) (@fun_eqMixin T1 T2).
+Axiom fun_choiceMixin : forall (T1 T2 : choiceType), choiceMixin (T1 -> T2).
+Canonical fun_choiceType (T1 T2 : choiceType) :=
+  Eval hnf in ChoiceType (T1 -> T2) (@fun_choiceMixin T1 T2).
+End fun_choiceType.
+End axioms.
 
 Section PR.
 Local Open Scope fset_scope.
@@ -44,6 +60,7 @@ Module ModelBacktrackableState.
 Local Open Scope fset_scope.
 
 Section monad.
+(*
 Variable S : finType.
 Local Obligation Tactic := try by [].
 
@@ -53,46 +70,43 @@ Program Definition _monad : choicemonad := @choiceMonad.Pack _
 (fun A B m (f : A -> {ffun S -> {fset (B * S)}}) =>
      [ffun s => \bigcup_(i <- (fun x => f x.1 x.2) @` (m s)) i]) (* bind *)
 _ _ _).
+*)
+Variable S : choiceType.
+Local Obligation Tactic := try by [].
+
+Program Definition _monad : choicemonad := @choiceMonad.Pack _
+(@choiceMonad.Class (fun A : choiceType => [choiceType of S -> {fset (A * S)}])
+(fun A (a : A) s => [fset (a, s)]) (* ret *)
+(fun A B m (f : A -> S -> {fset (B * S)}) =>
+     fun s => \bigcup_(i <- (fun x => f x.1 x.2) @` (m s)) i) (* bind *)
+_ _ _).
 Next Obligation.
-by move=> A B /= m f; apply/ffunP=> s;
- rewrite 2!ffunE imfset_set1 /= big_seq_fset1.
+move=> A B /= m f; extensionality s; by rewrite imfset_set1 /= big_seq_fset1.
 Qed.
 Next Obligation.
-move=> A B /=; apply/ffunP=> s.
-apply/bigfcupsP.
-
-
-bigcupP
-   forall (T I : finType) (x : T) (P : pred I) (F : I -> {set T}),
-   reflect (exists2 i : I, P i & x \in F i)
-     (x \in (\bigcup_(i | P i) F i)%SET)
-bigcupsP
-   forall (T I : finType) (U : pred T) (P : pred I) (F : I -> {set T}),
-   reflect (forall i : I, P i -> F i \subset U)
-     ((\bigcup_(i | P i) F i)%SET \subset U)
-
-
-
-apply/fsetP => /= x; apply/bigcupP; case: ifPn => xBs.
-  exists [set x]; by [apply/imsetP; exists x | rewrite inE].
-case => /= SA /imsetP[] /= sa saBs ->{SA}; rewrite inE => /eqP Hx.
+move=> A B /=; extensionality s.
+apply/fsetP => /= x; apply/bigfcupP; case: ifPn => xBs.
+  exists [fset x]; last by rewrite in_fset1.
+  rewrite andbT; apply/imfsetP; exists x => //=.
+  by rewrite {xBs}; case: x.
+case => /= SA; rewrite andbT => /imfsetP[] /= sa saBs ->{SA}; rewrite in_fset1 => /eqP Hx.
 move: xBs; rewrite Hx; apply/negP; rewrite negbK; by case: sa saBs Hx.
 Qed.
 Next Obligation.
 move=> A B C /= m f g; extensionality s.
-apply/setP => /= x; apply/bigcupP/bigcupP; case => /= CS /imsetP[/=].
-- move=> bs /bigcupP[/= BS] /imsetP[/= sa] sams ->{BS} bsfsa ->{CS} xgbs.
-  exists (\bigcup_(i in [set g x0.1 x0.2 | x0 in f sa.1 sa.2]) i).
-    by apply/imsetP => /=; exists sa.
-  apply/bigcupP; exists (g bs.1 bs.2) => //; by apply/imsetP => /=; exists bs.
-- move=> sa sams ->{CS} /bigcupP[/= CS] /imsetP[/= bs] bsfsa ->{CS} xgbs.
-  exists (g bs.1 bs.2) => //; apply/imsetP => /=; exists bs => //.
-  apply/bigcupP => /=; exists (f sa.1 sa.2) => //; by apply/imsetP => /=; exists sa.
+apply/fsetP => /= x; apply/bigfcupP/bigfcupP; case => /= CS; rewrite andbT => /imfsetP[/=].
+- move=> bs /bigfcupP[/= BS]; rewrite andbT => /imfsetP[/= sa] sams ->{BS} bsfsa ->{CS} xgbs.
+  exists (\bigcup_(i <- [fset g x0.1 x0.2 | x0 in f sa.1 sa.2]) i).
+    by rewrite andbT; apply/imfsetP => /=; exists sa.
+  apply/bigfcupP; exists (g bs.1 bs.2) => //; rewrite andbT; by apply/imfsetP => /=; exists bs.
+- move=> sa sams ->{CS} /bigfcupP[/= CS]; rewrite andbT => /imfsetP[/= bs] bsfsa ->{CS} xgbs.
+  exists (g bs.1 bs.2) => //; rewrite andbT; apply/imfsetP => /=; exists bs => //.
+  apply/bigfcupP => /=; exists (f sa.1 sa.2) => //; rewrite andbT; by apply/imfsetP => /=; exists sa.
 Qed.
 End monad.
 
 Section state.
-Variable S : finType.
+Variable S : choiceType.
 Local Obligation Tactic := try by [].
 
 Program Definition _state : relstateMonad S :=
