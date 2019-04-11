@@ -16,20 +16,37 @@ Unset Printing Implicit Defensive.
   - for the probability monad
 *)
 
-(* TODO
 Module ModelBacktrackableState.
+Local Open Scope fset_scope.
 
 Section monad.
 Variable S : finType.
 Local Obligation Tactic := try by [].
 
-Program Definition _monad : relmonad := @relMonad.Pack _
-(@relMonad.Class _
-(fun A (a : A) (s : S) => [set (a, s)]) (* ret *)
-(fun A B m (f : A -> S -> {set (B * S)}) =>
-     fun s => \bigcup_(i in (fun x => f x.1 x.2) @: (m s)) i) (* bind *)
+(*
+Toplevel input, characters 29-67:
+> Check (@choiceMonad.Class _ (fun A (a : A) (s : S) => [fset (a, s)]) (* ret *) (fun A B m (f : A -> S -> {fset (B * S)}) =>      fun s => \bigcup_(i in (fun x => f x.1 x.2) @` (m s)) i) (* bind *) _ _ _) .
+>                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The type of this term is a product while it is expected to be
+ (Choice.sort (?m A)).
+ *)
+
+(*S -> {fset (A * S)}
+ (Choice.sort (?m A)).
+*)
+
+Program Definition _monad : choicemonad := @choiceMonad.Pack _
+(@choiceMonad.Class (fun A : choiceType => [choiceType of {ffun S -> {fset (A * S)}}])
+(fun A (a : A) => [ffun s => [fset (a, s)]]) (* ret *)
+(fun A B m (f : A -> {ffun S -> {fset (B * S)}}) =>
+     [ffun s => \bigcup_(i <- (fun x => f x.1 x.2) @` (m s)) i]) (* bind *)
 _ _ _).
 Next Obligation.
+move=> A B /= m f.
+apply/ffunP => s. 
+rewrite ffunE.
+From mathcomp Require Import finset.
+rewrite big_fset1.
 move=> A B /= m f; extensionality s; by rewrite imset_set1 /= big_set1.
 Qed.
 Next Obligation.
