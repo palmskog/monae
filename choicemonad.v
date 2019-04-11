@@ -23,7 +23,7 @@ Reserved Notation "x <| p |> y" (format "x  <| p |>  y", at level 50).
   - Module choiceMonadAltCI.
   - Module choiceMonadNondet.
   - Module choiceMonadAltProb.
-  - Module relMonadState. TODO
+  - Module relMonadState.
   - Module relMonadNondetState. TODO
 
 *)
@@ -241,36 +241,36 @@ End Exports.
 End choiceMonadAltProb.
 Export choiceMonadAltProb.Exports.
 
-(* TODO Module relMonadState.
-Record mixin_of (S : finType) (M : relmonad) : Type := Mixin {
+Module choiceMonadState.
+Record mixin_of (S : choiceType) (M : choicemonad) : Type := Mixin {
   get : M S ;
-  put : S -> M unit_finType ;
+  put : S -> M unit_choiceType ;
   _ : forall s s', put s >> put s' = put s' ;
   _ : forall s, put s >> get = put s >> Ret s ;
   _ : get >>= put = skip ;
   _ : forall k : S -> S -> M S,
     get >>= (fun s => get >>= k s) = get >>= fun s => k s s
 }.
-Record class_of S (m : finType -> Type) := Class {
-  base : relMonad.class_of m ; mixin : mixin_of S (relMonad.Pack base) }.
-Structure t S : Type := Pack { m : finType -> Type ; class : class_of S m }.
+Record class_of S (m : choiceType -> choiceType) := Class {
+  base : choiceMonad.class_of m ; mixin : mixin_of S (choiceMonad.Pack base) }.
+Structure t S : Type := Pack { m : choiceType -> choiceType ; class : class_of S m }.
 (* inheritance *)
-Definition baseType S (M : t S) := relMonad.Pack (base (class M)).
+Definition baseType S (M : t S) := choiceMonad.Pack (base (class M)).
 Module Exports.
 Definition Get S (M : t S) : m M S :=
   let: Pack _ (Class _ (Mixin x _ _ _ _ _)) := M return m M S in x.
 Arguments Get {S M} : simpl never.
-Definition Put S (M : t S) : S -> m M unit_finType :=
-  let: Pack _ (Class _ (Mixin _ x _ _ _ _)) := M return S -> m M unit_finType in x.
+Definition Put S (M : t S) : S -> m M unit_choiceType :=
+  let: Pack _ (Class _ (Mixin _ x _ _ _ _)) := M return S -> m M unit_choiceType in x.
 Arguments Put {S M} : simpl never.
-Notation relstateMonad := t.
-Coercion baseType : relstateMonad >-> relmonad.
+Notation choicestateMonad := t.
+Coercion baseType : choicestateMonad >-> choicemonad.
 Canonical baseType.
 End Exports.
-End relMonadState.
-Export relMonadState.Exports.
+End choiceMonadState.
+Export choiceMonadState.Exports.
 
-Module relMonadNondetState.
+(* TODO Module relMonadNondetState.
 Record mixin_of (M : relnondetMonad) : Type := Mixin {
   (* backtrackable state *)
   _ : relBindLaws.right_zero (@Bind M) (@Fail _) ;

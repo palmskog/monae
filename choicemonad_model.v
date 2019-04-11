@@ -109,74 +109,74 @@ Section state.
 Variable S : choiceType.
 Local Obligation Tactic := try by [].
 
-Program Definition _state : relstateMonad S :=
-(@relMonadState.Pack _ _
-  (@relMonadState.Class _ _ (relMonad.class (_monad S)) (@relMonadState.Mixin _ _
-(fun s => [set (s, s)]) (* get *)
-(fun s _ => [set (tt, s)]) (* put *)
+Program Definition _state : choicestateMonad S :=
+(@choiceMonadState.Pack _ _
+  (@choiceMonadState.Class _ _ (choiceMonad.class (_monad S)) (@choiceMonadState.Mixin _ _
+(fun s => [fset (s, s)]) (* get *)
+(fun s _ => [fset (tt, s)]) (* put *)
 _ _ _ _))).
 Next Obligation.
 move=> s s'; extensionality s''.
-rewrite /Bind /=; apply/setP => /= x; rewrite inE; apply/bigcupP/eqP.
-- by case => /= x0 /imsetP[/= x1]; rewrite inE => /eqP _ ->; rewrite inE => /eqP.
-- move=> -> /=; exists [set (tt, s')]; last by rewrite inE.
-  by apply/imsetP => /=; exists (tt, s) => //; rewrite inE.
+rewrite /Bind /=; apply/fsetP => /= x; rewrite in_fset1; apply/bigfcupP/eqP.
+- by case => /= x0; rewrite andbT => /imfsetP[/= x1]; rewrite in_fset1 => /eqP _ ->; rewrite in_fset1 => /eqP.
+- move=> -> /=; exists [fset (tt, s')]; last by rewrite in_fset1.
+  by rewrite andbT; apply/imfsetP => /=; exists (tt, s) => //; rewrite in_fset1.
 Qed.
 Next Obligation.
 move=> s; extensionality s'.
-rewrite /Bind /=; apply/setP => /= x; apply/bigcupP/bigcupP.
-- case => /= x0 /imsetP[/= x1]; rewrite inE => /eqP -> ->; rewrite inE /= => /eqP ->.
-  exists [set (s, s)]; last by rewrite inE.
-  apply/imsetP => /=; exists (tt, s) => //; by rewrite inE.
-- case => /= x0 /imsetP[/= x1]; rewrite inE => /eqP -> ->; rewrite inE => /eqP ->.
-  exists [set (s ,s)]; last by rewrite inE.
-  by apply/imsetP => /=; exists (tt, s) => //; rewrite inE.
+rewrite /Bind /=; apply/fsetP => /= x; apply/bigfcupP/bigfcupP.
+- case => /= x0; rewrite andbT => /imfsetP[/= x1]; rewrite in_fset1 => /eqP -> ->; rewrite in_fset1 /= => /eqP ->.
+  exists [fset (s, s)]; last by rewrite in_fset1.
+  rewrite andbT; apply/imfsetP => /=; exists (tt, s) => //; by rewrite in_fset1.
+- case => /= x0; rewrite andbT => /imfsetP[/= x1]; rewrite in_fset1 => /eqP -> ->; rewrite in_fset1 => /eqP ->.
+  exists [fset (s ,s)]; last by rewrite in_fset1.
+  by rewrite andbT; apply/imfsetP => /=; exists (tt, s) => //; rewrite in_fset1.
 Qed.
 Next Obligation.
 extensionality s.
-rewrite /Bind /skip /= /Ret; apply/setP => /= x; apply/bigcupP/idP.
-- by case => /= x0 /imsetP[/= x1]; rewrite inE => /eqP -> ->; rewrite inE.
-- rewrite inE => /eqP ->; exists [set (tt, s)]; last by rewrite inE.
-  apply/imsetP; exists (s, s) => //; by rewrite inE.
+rewrite /Bind /skip /= /Ret; apply/fsetP => /= x; apply/bigfcupP/idP.
+- by case => /= x0; rewrite andbT => /imfsetP[/= x1]; rewrite in_fset1 => /eqP -> ->; rewrite in_fset1.
+- rewrite in_fset1 => /eqP ->; exists [fset (tt, s)]; last by rewrite in_fset1.
+  rewrite andbT; apply/imfsetP; exists (s, s) => //; by rewrite in_fset1.
 Qed.
 Next Obligation.
-move=> k; extensionality s; rewrite /Bind /=; apply/setP => x; apply/bigcupP/bigcupP.
-- case => /= x0 /imsetP[/= x1]; rewrite inE => /eqP -> -> /bigcupP[/= x2] /imsetP[/= x3].
-  rewrite inE => /eqP -> /= -> xkss.
-  exists (k s s s) => //; apply/imsetP; exists (s, s) => //; by rewrite inE.
-- case => /= x0 /imsetP[/= x1]; rewrite inE => /eqP -> -> /= xksss.
-  exists (\bigcup_(i in [set k (s, s).1 x2.1 x2.2 | x2 in [set ((s, s).2, (s, s).2)]]) i).
-    apply/imsetP; exists (s, s) => //; by rewrite inE.
-  apply/bigcupP; exists (k s s s) => //; apply/imsetP; exists (s, s) => //=; by rewrite inE.
+move=> k; extensionality s; rewrite /Bind /=; apply/fsetP => x; apply/bigfcupP/bigfcupP.
+- case => /= x0; rewrite andbT => /imfsetP[/= x1]; rewrite in_fset1 => /eqP -> -> /bigfcupP[/= x2]; rewrite andbT => /imfsetP[/= x3].
+  rewrite in_fset1 => /eqP -> /= -> xkss.
+  exists (k s s s) => //; rewrite andbT; apply/imfsetP; exists (s, s) => //; by rewrite in_fset1.
+- case => /= x0; rewrite andbT => /imfsetP[/= x1]; rewrite in_fset1 => /eqP -> -> /= xksss.
+  exists (\bigcup_(i <- [fset k (s, s).1 x2.1 x2.2 | x2 in [fset ((s, s).2, (s, s).2)]]) i).
+    rewrite andbT; apply/imfsetP; exists (s, s) => //; by rewrite in_fset1.
+  apply/bigfcupP; exists (k s s s) => //; rewrite andbT; apply/imfsetP; exists (s, s) => //=; by rewrite in_fset1.
 Qed.
 
 End state.
 
 Section fail.
-Variable S : finType.
-Program Definition _fail : relfailMonad := @relMonadFail.Pack _
-  (@relMonadFail.Class _ (relMonad.class (_monad S))
-    (@relMonadFail.Mixin _ (fun (A : finType) (_ : S) => set0) _)).
+Variable S : choiceType.
+Program Definition _fail : choicefailMonad := @choiceMonadFail.Pack _
+  (@choiceMonadFail.Class _ (choiceMonad.class (_monad S))
+    (@choiceMonadFail.Mixin _ (fun (A : choiceType) (_ : S) => fset0) _)).
 Next Obligation.
-move=> A B g; extensionality s; apply/setP => x; rewrite inE /Bind; apply/negbTE.
-apply/bigcupP; case => /= x0 /imsetP[/= sa]; by rewrite inE.
+move=> A B g; extensionality s; apply/fsetP => x; rewrite in_fset0 /Bind; apply/negbTE.
+apply/bigfcupP; case => /= x0; rewrite andbT => /imfsetP[/= sa]; by rewrite in_fset0.
 Qed.
 
 End fail.
 
 Section alt.
 
-Variable S : finType.
+Variable S : choiceType.
 Local Obligation Tactic := try by [].
-Program Definition _alt : relaltMonad := @relMonadAlt.Pack _
-  (@relMonadAlt.Class _ (@relMonad.class (_monad S))
-    (@relMonadAlt.Mixin (_monad S)
-      (fun (A : finType) (a b : S -> {set A * S}) (s : S) => a s :|: b s) _ _)).
-Next Obligation. by move=> A a b c; extensionality s; rewrite setUA. Qed.
+Program Definition _alt : choicealtMonad := @choiceMonadAlt.Pack _
+  (@choiceMonadAlt.Class _ (@choiceMonad.class (_monad S))
+    (@choiceMonadAlt.Mixin (_monad S)
+      (fun (A : choiceType) (a b : S -> {fset A * S}) (s : S) => a s `|` b s) _ _)).
+Next Obligation. by move=> A a b c; extensionality s; rewrite fsetUA. Qed.
 Next Obligation.
 move=> A B /= m1 m2 k; extensionality s; rewrite /Bind /=.
-apply/setP => /= bs; rewrite !inE; apply/bigcupP/orP.
-- case => /= BS /imsetP[/= sa]; rewrite inE => /orP[sam1s ->{BS} Hbs|sam2s ->{BS} Hbs].
+apply/fsetP => /= bs; rewrite !in_fset; apply/bigfcupP => /=; case: ifPn.
+- rewrite mem_cat => /orP[|] /= BS. ; rewrite andbT => /imfsetP[/= sa]. ; rewrite inE => /orP[sam1s ->{BS} Hbs|sam2s ->{BS} Hbs].
   + left; apply/bigcupP => /=; exists (k sa.1 sa.2) => //; apply/imsetP; by exists sa.
   + right; apply/bigcupP => /=; exists (k sa.1 sa.2) => //; apply/imsetP; by exists sa.
 - case => /bigcupP[/= BS /imsetP[/= sa sams ->{BS} bsksa]].
@@ -191,8 +191,8 @@ Section nondet.
 Variable S : finType.
 Local Obligation Tactic := try by [].
 Program Definition nondetbase : relnondetMonad :=
-  @relMonadNondet.Pack _ (@relMonadNondet.Class _ (@relMonadFail.class (_fail S))
-    (@relMonadAlt.mixin (_alt S) _) (@relMonadNondet.Mixin _ _ _ _)).
+  @choiceMonadNondet.Pack _ (@choiceMonadNondet.Class _ (@choiceMonadFail.class (_fail S))
+    (@choiceMonadAlt.mixin (_alt S) _) (@choiceMonadNondet.Mixin _ _ _ _)).
 Next Obligation. move=> A /= m; extensionality s; by rewrite set0U. Qed.
 Next Obligation. move=> A /= m; extensionality s; by rewrite setU0. Qed.
 End nondet.
@@ -202,9 +202,9 @@ Section nondetstate.
 Variable S : finType.
 Local Obligation Tactic := try by [].
 Program Definition nondetstate : relnondetStateMonad S :=
-  @relMonadNondetState.Pack _ _
-    (@relMonadNondetState.Class _ _ (relMonadNondet.class (nondetbase S))
-      (relMonadState.mixin (relMonadState.class (_state S))) (@relMonadNondetState.Mixin _ _ _)).
+  @choiceMonadNondetState.Pack _ _
+    (@choiceMonadNondetState.Class _ _ (choiceMonadNondet.class (nondetbase S))
+      (choiceMonadState.mixin (choiceMonadState.class (_state S))) (@choiceMonadNondetState.Mixin _ _ _)).
 Next Obligation.
 move=> A B /= g; rewrite /Bind /=; extensionality s; apply/setP => /= sa.
 apply/bigcupP/idP.
