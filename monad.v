@@ -145,23 +145,23 @@ Proof. by []. Qed.
 (* map laws of a functor *)
 Module FunctorLaws.
 Section def.
-Variable (M : Type -> Type) (f : forall A B, (A -> B) -> M A -> M B).
+Variable (M : choiceType -> choiceType) (f : forall A B : choiceType, (A -> B) -> M A -> M B).
 Definition id := forall A, f id = id :> (M A -> M A).
-Definition comp := forall A B C (g : B -> C) (h : A -> B),
+Definition comp := forall (A B C : choiceType) (g : B -> C) (h : A -> B),
   f (g \o h) = f g \o f h :> (M A -> M C).
 End def.
 End FunctorLaws.
 
 Module Functor.
-Record class_of (m : Type -> Type) : Type := Class {
-  f : forall A B, (A -> B) -> m A -> m B ;
+Record class_of (m : choiceType -> choiceType) : Type := Class {
+  f : forall A B : choiceType, (A -> B) -> m A -> m B ;
   _ : FunctorLaws.id f ;
   _ : FunctorLaws.comp f
 }.
-Structure t : Type := Pack { m : Type -> Type ; class : class_of m }.
+Structure t : Type := Pack { m : choiceType -> choiceType ; class : class_of m }.
 Module Exports.
-Definition Fun (F : t) : forall A B, (A -> B) -> m F A -> m F B :=
-  let: Pack _ (Class f _ _) := F return forall A B, (A -> B) -> m F A -> m F B in f.
+Definition Fun (F : t) : forall A B : choiceType, (A -> B) -> m F A -> m F B :=
+  let: Pack _ (Class f _ _) := F return forall A B : choiceType, (A -> B) -> m F A -> m F B in f.
 Arguments Fun _ [A] [B] : simpl never.
 Notation functor := t.
 Coercion m : functor >-> Funclass.
@@ -184,9 +184,9 @@ congr Functor.Class; exact/ProofIrrelevance.proof_irrelevance.
 Qed.*)
 End functor_lemmas.
 
-Definition Squaring (A : Type) := (A * A)%type.
+Definition Squaring (A : choiceType) := (A * A)%type.
 Notation "A `2" := (Squaring A).
-Definition squaring_f A B (f : A -> B) : A`2 -> B`2 := fun x => (f x.1, f x.2).
+Definition squaring_f (A B : choiceType) (f : A -> B) : A`2 -> B`2 := fun x => (f x.1, f x.2).
 Lemma squaring_f_id : FunctorLaws.id squaring_f.
 Proof. by move=> A /=; apply functional_extensionality => -[x1 x2]. Qed.
 Lemma squaring_f_comp : FunctorLaws.comp squaring_f.
@@ -194,7 +194,7 @@ Proof. by move=> A B C g h /=; apply functional_extensionality => -[x1 x2]. Qed.
 Definition squaring : functor (*Squaring*) :=
   Functor.Pack (Functor.Class squaring_f_id squaring_f_comp).
 Notation "f ^`2" := (squaring # f).
-Lemma squaringE A B (f : A -> B) x : (f ^`2) x = (f x.1, f x.2).
+Lemma squaringE (A B : choiceType) (f : A -> B) x : (f ^`2) x = (f x.1, f x.2).
 Proof. by []. Qed.
 
 Section functorid.
@@ -206,7 +206,7 @@ End functorid.
 
 Section functorcomposition.
 Variables f g : functor.
-Definition functorcomposition A B := fun h : A -> B => f # (g # h).
+Definition functorcomposition (A B : choiceType) := fun h : A -> B => f # (g # h).
 Lemma functorcomposition_id : FunctorLaws.id functorcomposition.
 Proof.
 by rewrite /FunctorLaws.id => A; rewrite /functorcomposition 2!functor_id.
@@ -231,7 +231,7 @@ Proof.
 destruct f as [m [f0 f1 f2]]; congr Functor.Pack; congr Functor.Class => //;
   exact/ProofIrrelevance.proof_irrelevance.
 Qed.
-Lemma FIdf A B (f : A -> B) : FId # f = f.
+Lemma FIdf (A B : choiceType) (f : A -> B) : FId # f = f.
 Proof. by []. Qed.
 Lemma FCompA (f g h : functor) : FComp (FComp f g) h = FComp f (FComp g h).
 Proof.
@@ -241,13 +241,13 @@ destruct h as [o [h0 h1 h2]].
 congr Functor.Pack; congr Functor.Class => //;
   exact/ProofIrrelevance.proof_irrelevance.
 Qed.
-Lemma FCompE (f g : functor) A B (k : A -> B) : (FComp f g) # k = f # (g # k).
+Lemma FCompE (f g : functor) (A B : choiceType) (k : A -> B) : (FComp f g) # k = f # (g # k).
 Proof. by []. Qed.
 End functorcomposition_lemmas.
 
 Section curry_functor.
-Definition curry_M X : Type -> Type := fun B => (X * B)%type.
-Definition curry_f X A B (f : A -> B) : curry_M X A -> curry_M X B :=
+Definition curry_M (X : choiceType) : choiceType -> choiceType := fun B => [choiceType of (X * B)%type].
+Definition curry_f (X A B : choiceType) (f : A -> B) : curry_M X A -> curry_M X B :=
   fun x : X * A => (x.1, f x.2).
 Lemma curry_f_id X : FunctorLaws.id (@curry_f X).
 Proof.
@@ -263,9 +263,28 @@ Definition curry_F X : functor :=
   Functor.Pack (Functor.Class (curry_f_id X) (curry_f_comp X)).
 End curry_functor.
 
+From mathcomp Require Import boolp.
+
+Section fun_choiceType.
+
+Definition fun_eqMixin (T1 T2 : eqType) : Equality.mixin_of (T1 -> T2).
+Proof.
+apply: (@Equality.Mixin _ (fun f g : T1 -> T2 => `[< f =1 g >])) => f g.
+apply: (iffP idP) => [/asboolP|->]; [exact/funext|exact/asboolP].
+Qed.
+Canonical fun_eqType (T1 T2 : eqType) :=
+  Eval hnf in EqType (T1 -> T2) (@fun_eqMixin T1 T2).
+
+Axiom fun_choiceMixin : forall (T1 T2 : choiceType), choiceMixin (T1 -> T2).
+Admitted.
+Canonical fun_choiceType (T1 T2 : choiceType) :=
+  Eval hnf in ChoiceType (T1 -> T2) (@fun_choiceMixin T1 T2).
+
+End fun_choiceType.
+
 Section uncurry_functor.
-Definition uncurry_M X : Type -> Type := fun B => X -> B.
-Definition uncurry_f X A B (f : A -> B) : uncurry_M X A -> uncurry_M X B :=
+Definition uncurry_M (X : choiceType) : choiceType -> choiceType := fun B => [choiceType of X -> B].
+Definition uncurry_f (X A B : choiceType) (f : A -> B) : uncurry_M X A -> uncurry_M X B :=
   fun g : X -> A => f \o g.
 Lemma uncurry_f_id X : FunctorLaws.id (@uncurry_f X).
 Proof.
@@ -283,9 +302,9 @@ End uncurry_functor.
 
 Section natural_transformation.
 Variables f g : functor.
-Definition transformation_type := forall A, f A -> g A.
+Definition transformation_type := forall A : choiceType, f A -> g A.
 Definition naturalP (phi : transformation_type) :=
-  forall A B (h : A -> B), (g # h) \o (phi A) = (phi B) \o (f # h).
+  forall (A B : choiceType) (h : A -> B), (g # h) \o (phi A) = (phi B) \o (f # h).
 End natural_transformation.
 Arguments naturalP : clear implicits.
 
@@ -298,7 +317,7 @@ End natural_transformation_example.
 
 Section adjoint_functors.
 Variables f g : functor.
-Definition eta_type := forall A, A -> (g \o f) A.
+Definition eta_type := forall A : choiceType, A -> (g \o f) A.
 Definition eps_type := forall A, (f \o g) A -> A.
 Definition adjointP (eps : eps_type) (eta : eta_type) :=
   naturalP (FComp f g) FId eps /\ naturalP FId (FComp g f) eta.
@@ -306,14 +325,14 @@ Definition triangular_law1 (eps : eps_type) (eta : eta_type) A :=
   (eps (f A)) \o (f # eta A) = @id (f A).
 Definition triangular_law2 (eps : eps_type) (eta : eta_type) A :=
   (g # eps A) \o (eta (g A)) = @id (g A).
-Definition phi A B (eta : eta_type) : (f A -> B) -> A -> g B :=
+Definition phi A (B : choiceType) (eta : eta_type) : (f A -> B) -> A -> g B :=
   fun h => (g # h) \o (@eta A).
-Definition psi A B (eps : eps_type) : (A -> g B) -> f A -> B :=
+Definition psi (A : choiceType) B (eps : eps_type) : (A -> g B) -> f A -> B :=
   fun h => (@eps B) \o (f # h).
 End adjoint_functors.
 
 Section adjoint_example.
-Variable (X : Type).
+Variable (X : choiceType).
 Definition curry_eps : eps_type (curry_F X) (uncurry_F X) :=
   fun A (af : X * (X -> A)) => af.2 af.1.
 Definition curry_eta : eta_type (curry_F X) (uncurry_F X) :=
@@ -344,7 +363,7 @@ End adjoint_example.
 
 Module BindLaws.
 Section bindlaws.
-Variable M : Type -> Type.
+Variable M : choiceType -> choiceType.
 
 Variable b : forall A B, M A -> (A -> M B) -> M B.
 
@@ -366,10 +385,10 @@ Definition right_zero (f : forall A, M A) :=
 
 Definition left_zero (f : forall A, M A) := forall A B g, f A >>= g = f B.
 
-Definition left_neutral (r : forall A, A -> M A) :=
-  forall A B (x : A) (f : A -> M B), r _ x >>= f = f x.
+Definition left_neutral (r : forall A : choiceType, A -> M A) :=
+  forall (A : choiceType) B (x : A) (f : A -> M B), r _ x >>= f = f x.
 
-Definition right_neutral (r : forall A, A -> M A) :=
+Definition right_neutral (r : forall A : choiceType, A -> M A) :=
   forall A (m : M A), m >>= r _ = m.
 
 Definition left_id (r : forall A, M A) (add : forall B, M B -> M B -> M B) :=
@@ -388,7 +407,7 @@ Variables (eps : eps_type f g) (eta : eta_type f g).
 Definition M := g \o f.
 Definition m : functor := FComp g f.
 Definition muM A : M (M A) -> M A := g # (@eps (f A)).
-Definition etaM A : A -> M A := @eta A.
+Definition etaM (A : choiceType) : A -> M A := @eta A.
 Definition bind A B : M A -> (A -> M B) -> M B :=
   fun x c => muM (((FComp g f) # c) x).
 End def.
@@ -484,7 +503,7 @@ End monad_of_adjoint.
 Module JoinLaws.
 Section join_laws.
 Context {M : functor}.
-Variables (ret : forall A, A -> M A) (join : transformation_type (FComp M M) M).
+Variables (ret : forall A : choiceType, A -> M A) (join : transformation_type (FComp M M) M).
 
 Definition ret_naturality := naturalP FId M ret.
 
@@ -502,7 +521,7 @@ End JoinLaws.
 
 Section from_join_laws_to_bind_laws.
 Variable F : functor.
-Variable (ret : forall A, A -> F A) (join : forall A, F (F A) -> F A).
+Variable (ret : forall A : choiceType, A -> F A) (join : forall A, F (F A) -> F A).
 
 Hypothesis ret_naturality : JoinLaws.ret_naturality ret.
 Hypothesis join_naturality : JoinLaws.join_naturality join.
@@ -510,7 +529,7 @@ Hypothesis joinretM : JoinLaws.join_left_unit ret join.
 Hypothesis joinMret : JoinLaws.join_right_unit ret join.
 Hypothesis joinA : JoinLaws.join_associativity join.
 
-Let bind (A B : Type) (m : F A) (f : A -> F B) : F B := join ((F # f) m).
+Let bind (A B : choiceType) (m : F A) (f : A -> F B) : F B := join ((F # f) m).
 
 Lemma bindretf_derived : BindLaws.left_neutral bind ret.
 Proof.
@@ -534,7 +553,7 @@ End from_join_laws_to_bind_laws.
 
 Module Monad.
 Record mixin_of (M : functor) : Type := Mixin {
-  ret : forall A, A -> M A ;
+  ret : forall A : choiceType, A -> M A ;
   join : forall A, M (M A) -> M A ;
   _ : JoinLaws.ret_naturality ret ;
   _ : JoinLaws.join_naturality join ;
@@ -542,13 +561,13 @@ Record mixin_of (M : functor) : Type := Mixin {
   _ : JoinLaws.join_right_unit ret join ;
   _ : JoinLaws.join_associativity join;
   }.
-Record class_of (M : Type -> Type) := Class {
+Record class_of (M : choiceType -> choiceType) := Class {
   base : Functor.class_of M ; mixin : mixin_of (Functor.Pack base) }.
-Structure t : Type := Pack { m : Type -> Type ; class : class_of m }.
+Structure t : Type := Pack { m : choiceType -> choiceType ; class : class_of m }.
 Definition baseType (M : t) := Functor.Pack (base (class M)).
 Module Exports.
-Definition Ret (M : t) : forall A, A -> m M A :=
-  let: Pack _ (Class _ (Mixin ret _ _ _ _ _ _) ) := M return forall A, A -> m M A in ret.
+Definition Ret (M : t) : forall A : choiceType, A -> m M A :=
+  let: Pack _ (Class _ (Mixin ret _ _ _ _ _ _) ) := M return forall A : choiceType, A -> m M A in ret.
 Arguments Ret {M A} : simpl never.
 Definition Join (M : t) A : m M (m M A) -> m M A :=
   let: Pack _ (Class _ (Mixin _ join _ _ _ _ _)) := M in join A.
@@ -580,7 +599,7 @@ Variable M : monad.
 Definition Bind A B (x : M A) (f : A -> M B) : M B := Join ((M # f) x).
 Arguments Bind {A B} : simpl never.
 Local Notation "m >>= f" := (Bind m f).
-Lemma bindE A B : forall x (f : A -> M B), x >>= f = Join ((M # f) x).
+Lemma bindE (A B : choiceType) : forall x (f : A -> M B), x >>= f = Join ((M # f) x).
 Proof. by []. Qed.
 Lemma bindretf : BindLaws.left_neutral (@Bind) (@Ret _).
 Proof. apply: bindretf_derived; [exact: ret_naturality | exact: joinretM]. Qed.
@@ -589,7 +608,7 @@ Proof. apply: bindmret_derived; exact: joinMret. Qed.
 Lemma bindA : BindLaws.associative (@Bind).
 Proof. apply bindA_derived; [exact: join_naturality | exact: joinA]. Qed.
 
-Lemma bindE' (A B:Type) : Bind = fun x (f : A -> M B) => Join ((M # f) x).
+Lemma bindE' (A B : choiceType) : Bind = fun x (f : A -> M B) => Join ((M # f) x).
 Proof. by []. Qed.
 Lemma joinretM' A C (f:C->_) : @Join M A \o (@Ret M (M A) \o f) = f.
 Proof. by rewrite compA joinretM. Qed.
@@ -672,17 +691,17 @@ Tactic Notation "rewrite_" constr(lem) :=
   (With (rewrite lem; reflexivity) Open (X in @Bind _ _ _ _ X = _ )) ||
   (With (rewrite lem; reflexivity) Open (X in _ = @Bind _ _ _ _ X)).
 
-Lemma bindmskip (M : monad) (m : M unit) : m >> skip = m.
+Lemma bindmskip (M : monad) (m : M unit_choiceType) : m >> skip = m.
 Proof. rewrite -[RHS]bindmret; bind_ext; by case. Qed.
 
 Lemma bindskipf (M : monad) A (m : M A) : skip >> m = m.
 Proof. exact: bindretf. Qed.
 
-Fixpoint sequence (M : monad) A (s : seq (M A)) : M (seq A) :=
+Fixpoint sequence (M : monad) A (s : seq (M A)) : M [choiceType of seq A] :=
   if s isn't h :: t then Ret [::] else
   do v <- h; do vs <- sequence t; Ret (v :: vs).
 
-Lemma sequence_nil (M : monad) A : sequence [::] = Ret [::] :> M (seq A).
+Lemma sequence_nil (M : monad) (A : choiceType) : sequence [::] = Ret [::] :> M [choiceType of seq A].
 Proof. by []. Qed.
 
 Lemma sequence_cons (M : monad) A h (t : seq (M A)) :
@@ -691,14 +710,14 @@ Proof. by []. Qed.
 
 Module Monad_of_bind_ret.
 Section monad_of_bind_ret.
-Variable M : Type -> Type.
-Variable bind : forall (A B : Type), M A -> (A -> M B) -> M B.
-Variable ret : forall A, A -> M A.
+Variable M : choiceType -> choiceType.
+Variable bind : forall (A B : choiceType), M A -> (A -> M B) -> M B.
+Variable ret : forall A : choiceType, A -> M A.
 Hypothesis bindretf : BindLaws.left_neutral bind ret.
 Hypothesis bindmret : BindLaws.right_neutral bind ret.
 Hypothesis bindA : BindLaws.associative bind.
 
-Definition fmap A B (f : A -> B) (m : M A) := bind m (ret (A:=B) \o f).
+Definition fmap (A B : choiceType) (f : A -> B) (m : M A) := bind m (ret (A:=B) \o f).
 Lemma fmap_id : FunctorLaws.id fmap.
 Proof.
 move=> A; apply functional_extensionality => m; by rewrite /fmap bindmret.
@@ -712,13 +731,13 @@ Qed.
 Definition functor_mixin := Functor.Class fmap_id fmap_o.
 Let M' := Functor.Pack functor_mixin.
 
-Lemma fmapE A B (f : A -> B) m : (M' # f) m = bind m (ret (A:=B) \o f).
+Lemma fmapE (A B : choiceType) (f : A -> B) m : (M' # f) m = bind m (ret (A:=B) \o f).
 Proof. by []. Qed.
 
-Let ret' : forall A, A -> M' A := ret.
+Let ret' : forall A : choiceType, A -> M' A := ret.
 Definition join A (pp : M' (M' A)) := bind pp id.
 
-Let bind_fmap A B C (f : A -> B) (m : M A) (g : B -> M C) :
+Let bind_fmap (A B : choiceType) C (f : A -> B) (m : M A) (g : B -> M C) :
   bind (fmap f m) g = bind m (g \o f).
 Proof.
 rewrite /fmap bindA; congr bind.
@@ -731,10 +750,10 @@ move=> A B h; rewrite FIdf; apply functional_extensionality => ?.
 by rewrite compE /= /fmap fmapE /= bindretf.
 Qed.
 
-Let bindE A B m (f : A -> M' B) : bind m f = join ((M' # f) m).
+Let bindE (A B : choiceType) m (f : A -> M' B) : bind m f = join ((M' # f) m).
 Proof. by rewrite /join bind_fmap. Qed.
 
-Let fmap_bind A B C (f : A -> B) m (g : C -> M A) :
+Let fmap_bind (A B C : choiceType) (f : A -> B) m (g : C -> M A) :
   (fmap f) (bind m g) = bind m (fmap f \o g).
 Proof. by rewrite /fmap bindA bindE. Qed.
 
@@ -780,16 +799,16 @@ Export Monad_of_bind_ret.Exports.
 Section fmap_and_join.
 Variable M : monad.
 
-Definition fmap A B (f : A -> B) (m : M _) := (M # f) m.
+Definition fmap (A B : choiceType) (f : A -> B) (m : M _) := (M # f) m.
 
-Lemma fmapE A B (f : A -> B) (m : M _) : fmap f m = m >>= (Ret \o f).
+Lemma fmapE (A B : choiceType) (f : A -> B) (m : M _) : fmap f m = m >>= (Ret \o f).
 Proof. by rewrite bindE functor_o compE -(compE Join) joinMret. Qed.
 
-Lemma bind_fmap A B C (f : A -> B) (m : M A) (g : B -> M C) :
+Lemma bind_fmap (A B : choiceType) C (f : A -> B) (m : M A) (g : B -> M C) :
   fmap f m >>= g = m >>= (g \o f).
 Proof. by rewrite fmapE bindA; rewrite_ bindretf. Qed.
 
-Lemma fmap_if A B (f : A -> B) b (m : M A) a :
+Lemma fmap_if (A B : choiceType) (f : A -> B) b (m : M A) a :
   fmap f (if b then m else Ret a) = if b then fmap f m else Ret (f a).
 Proof. case: ifPn => Hb //; by rewrite fmapE bindretf. Qed.
 
