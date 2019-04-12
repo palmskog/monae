@@ -17,7 +17,7 @@ Local Open Scope mu_scope.
 Section definitions.
 Variable M : altMonad.
 
-Variables (A B : Type).
+Variables (A : Type) (B : choiceType).
 
 Definition deterministic A B (f : A -> M B) := exists g : A -> B, f = Ret \o g.
 
@@ -36,7 +36,7 @@ Section aggregate_deterministic.
 
 Section foldl_perm_deterministic.
 Variable M : altCIMonad.
-Variables (A B : Type) (op : B -> A -> B) (b : B).
+Variables (A B : choiceType) (op : B -> A -> B) (b : B).
 Local Notation "x (.) y" := (op x y) (at level 11).
 Hypothesis opP : forall (x y : A) (w : seq A), (foldl op b w (.) x) (.) y = (foldl op b w (.) y) (.) x.
 
@@ -71,7 +71,7 @@ End foldl_perm_deterministic.
 
 Section foldl_perm_deterministic_contd.
 Variable M : altCIMonad.
-Variables (A B : Type) (op : B -> A -> B).
+Variables (A B : choiceType) (op : B -> A -> B).
 Local Notation "x (.) y" := (op x y) (at level 11).
 Hypothesis opP : forall (x y : A) (w : B), (w (.) x) (.) y = (w (.) y) (.) x.
 
@@ -101,7 +101,7 @@ End foldl_perm_deterministic_contd.
 
 Section theorem36.
 Variable M : altCIMonad.
-Variables (A B : Type) (b : B) (mul : B -> A -> B) (add : B -> B -> B).
+Variables (A B : choiceType) (b : B) (mul : B -> A -> B) (add : B -> B -> B).
 Hypotheses (addA : associative add) (addC : commutative add).
 
 (* theorem 3.6 in mu2017, see also netys2017 *)
