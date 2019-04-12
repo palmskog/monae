@@ -176,11 +176,11 @@ End state.
 
 Section fail.
 Variable S : choiceType.
-Program Definition _fail : choicefailMonad := @choiceMonadFail.Pack _
-  (@choiceMonadFail.Class _ (choiceMonad.class (_monad S))
-    (@choiceMonadFail.Mixin _ (fun (A : choiceType) (_ : S) => fset0) _)).
+Program Definition _fail : failMonad := @MonadFail.Pack _
+  (@MonadFail.Class _ (Monad.class (_monad S))
+    (@MonadFail.Mixin _ (fun (A : choiceType) (_ : S) => fset0) _)).
 Next Obligation.
-move=> A B g; extensionality s; apply/fsetP => x; rewrite inE /Bind; apply/negbTE.
+move=> A B g; extensionality s; apply/fsetP => x; rewrite inE BindE; apply/negbTE.
 apply/bigfcupP'; case => /= x0 /imfsetP[/= sa]; by rewrite inE.
 Qed.
 
@@ -190,13 +190,13 @@ Section alt.
 
 Variable S : choiceType.
 Local Obligation Tactic := try by [].
-Program Definition _alt : choicealtMonad := @choiceMonadAlt.Pack _
-  (@choiceMonadAlt.Class _ (@choiceMonad.class (_monad S))
-    (@choiceMonadAlt.Mixin (_monad S)
+Program Definition _alt : altMonad := @MonadAlt.Pack _
+  (@MonadAlt.Class _ (@Monad.class (_monad S))
+    (@MonadAlt.Mixin (_monad S)
       (fun (A : choiceType) (a b : S -> {fset A * S}) (s : S) => a s `|` b s) _ _)).
 Next Obligation. by move=> A a b c; extensionality s; rewrite fsetUA. Qed.
 Next Obligation.
-move=> A B /= m1 m2 k; extensionality s; rewrite /Bind /=.
+move=> A B /= m1 m2 k; extensionality s; rewrite !BindE /=.
 apply/fsetP => /= bs; rewrite !inE; apply/bigfcupP'/orP.
 - case => /= BS /imfsetP[/= sa]; rewrite inE => /orP[sam1s ->{BS} Hbs|sam2s ->{BS} Hbs].
   + left; apply/bigfcupP' => /=; exists (k sa.1 sa.2) => //; apply/imfsetP; by exists sa.
@@ -212,9 +212,9 @@ Section nondet.
 
 Variable S : choiceType.
 Local Obligation Tactic := try by [].
-Program Definition nondetbase : choicenondetMonad :=
-  @choiceMonadNondet.Pack _ (@choiceMonadNondet.Class _ (@choiceMonadFail.class (_fail S))
-    (@choiceMonadAlt.mixin (_alt S) _) (@choiceMonadNondet.Mixin _ _ _ _)).
+Program Definition nondetbase : nondetMonad :=
+  @MonadNondet.Pack _ (@MonadNondet.Class _ (@MonadFail.class (_fail S))
+    (@MonadAlt.mixin (_alt S) _) (@MonadNondet.Mixin _ _ _ _)).
 Next Obligation. move=> A /= m; extensionality s; by rewrite fset0U. Qed.
 Next Obligation. move=> A /= m; extensionality s; by rewrite fsetU0. Qed.
 End nondet.
@@ -223,17 +223,17 @@ Section nondetstate.
 
 Variable S : choiceType.
 Local Obligation Tactic := try by [].
-Program Definition nondetstate : choicenondetStateMonad S :=
-  @choiceMonadNondetState.Pack _ _
-    (@choiceMonadNondetState.Class _ _ (choiceMonadNondet.class (nondetbase S))
-      (choiceMonadState.mixin (choiceMonadState.class (_state S))) (@choiceMonadNondetState.Mixin _ _ _)).
+Program Definition nondetstate : nondetStateMonad S :=
+  @MonadNondetState.Pack _ _
+    (@MonadNondetState.Class _ _ (MonadNondet.class (nondetbase S))
+      (MonadState.mixin (MonadState.class (_state S))) (@MonadNondetState.Mixin _ _ _)).
 Next Obligation.
-move=> A B /= g; rewrite /Bind /=; extensionality s; apply/fsetP => /= sa.
+move=> A B /= g; rewrite !BindE /=; extensionality s; apply/fsetP => /= sa.
 apply/idP/idP/bigfcupP'.
 case => /= SA /imfsetP[/= bs bsgs ->{SA}]; by rewrite inE.
 Qed.
 Next Obligation.
-move=> A B /= m k1 k2; extensionality s; rewrite /Bind /=; apply/fsetP => /= bs.
+move=> A B /= m k1 k2; extensionality s; rewrite !BindE /=; apply/fsetP => /= bs.
 apply/bigfcupP'/idP.
 - case => /= BS /imfsetP[/= sa sams ->{BS}]; rewrite inE => /orP[bsk1|bsk2].
   + rewrite inE; apply/orP; left; apply/bigfcupP'; exists (k1 sa.1 sa.2) => //.
@@ -255,28 +255,38 @@ End ModelBacktrackableState.
 
 From infotheo Require Import convex.
 
-Module choiceMonadProbModel.
+Module MonadProbModel.
 Local Obligation Tactic := idtac.
 
-Program Definition monad : choiceMonad.t := @choiceMonad.Pack Dist
-  (@choiceMonad.Class _ Dist1.d DistBind.d _ _ _ ).
+Program Definition monad : Monad.t :=
+  @Monad_of_bind_ret _ DistBind.d Dist1.d _ _ _.
 Next Obligation. move=> ? ? ? ?; exact: DistBind1f. Qed.
 Next Obligation. move=> ? ?; exact: DistBindp1. Qed.
 Next Obligation. move=> ? ? ? ? ?; exact: DistBindA. Qed.
 
-Program Definition prob_mixin : choiceMonadProb.mixin_of monad :=
-  @choiceMonadProb.Mixin monad (fun p (A : choiceType) (m1 m2 : Dist A) =>
+Lemma BindE (A B : choiceType) m (f : A -> monad B) :
+  (m >>= f) = DistBind.d m f.
+Proof.
+rewrite /Bind /Join /= /Monad_of_bind_ret.join /Fun /=.
+rewrite /Monad_of_bind_ret.fmap DistBindA; congr DistBind.d.
+by apply functional_extensionality => a; rewrite /= DistBind1f.
+Qed.
+
+Program Definition prob_mixin : MonadProb.mixin_of monad :=
+  @MonadProb.Mixin monad (fun p (A : choiceType) (m1 m2 : Dist A) =>
     (@Conv2Dist.d A m1 m2 p)) _ _ _ _ _ _.
 Next Obligation. move=> ? ? ?; exact: Conv2Dist.conv0. Qed.
 Next Obligation. move=> ? ? ?; exact: Conv2Dist.conv1. Qed.
 Next Obligation. move=> ? ? ?; exact: Conv2Dist.convC. Qed.
 Next Obligation. move=> ? ? ?; exact: Conv2Dist.convmm. Qed.
 Next Obligation. move=> ? ? ? ? ? ? ? ? [? ?] /=; exact: Conv2Dist.convA. Qed.
-Next Obligation. move=> ? ? ? ? ? ?; exact: Conv2Dist.bind_left_distr. Qed.
+Next Obligation.
+by move=> ? ? ? ? ? ?; rewrite !BindE Conv2Dist.bind_left_distr.
+Qed.
 
-Definition prob_class : choiceMonadProb.class_of Dist :=
-  @choiceMonadProb.Class _ _ prob_mixin.
+Definition prob_class : MonadProb.class_of Dist :=
+  @MonadProb.Class _ _ prob_mixin.
 
-Definition prob : choiceMonadProb.t := choiceMonadProb.Pack prob_class.
+Definition prob : MonadProb.t := MonadProb.Pack prob_class.
 
-End choiceMonadProbModel.
+End MonadProbModel.
