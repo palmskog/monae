@@ -5,7 +5,7 @@ From mathcomp Require Import finmap (* set *) bigop.
 From mathcomp Require Import boolp.
 
 From infotheo Require Import Reals_ext ssr_ext dist.
-Require Import choicemonad.
+Require Import monad state_monad proba_monad.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -69,12 +69,11 @@ Section monad.
 Variable S : choiceType.
 Local Obligation Tactic := try by [].
 
-Program Definition _monad : choicemonad := @choiceMonad.Pack _
-(@choiceMonad.Class (fun A : choiceType => [choiceType of S -> {fset (A * S)}])
-(fun A (a : A) s => [fset (a, s)]) (* ret *)
+Program Definition _monad : monad := @Monad_of_bind_ret
+(fun A : choiceType => [choiceType of S -> {fset (A * S)}])
 (fun A B m (f : A -> S -> {fset (B * S)}) =>
      fun s => \bigcup_(i <- (fun x => f x.1 x.2) @` (m s)) i) (* bind *)
-_ _ _).
+(fun A (a : A) s => [fset (a, s)]) (* ret *) _ _ _.
 Next Obligation.
 move=> A B /= m f; extensionality s; by rewrite imfset_set1 /= big_seq_fset1.
 Qed.
@@ -104,18 +103,23 @@ Section state.
 Variable S : choiceType.
 Local Obligation Tactic := try by [].
 
-Program Definition _state : choicestateMonad S :=
-(@choiceMonadState.Pack _ _
-  (@choiceMonadState.Class _ _ (choiceMonad.class (_monad S)) (@choiceMonadState.Mixin _ _
+Program Definition _state : stateMonad S :=
+(@MonadState.Pack _ _
+  (@MonadState.Class _ _ (Monad.class (_monad S)) (@MonadState.Mixin _ _
 (fun s => [fset (s, s)]) (* get *)
 (fun s _ => [fset (tt, s)]) (* put *)
 _ _ _ _))).
 Next Obligation.
 move=> s s'; extensionality s''.
+(*rewrite /Bind /Join /= /Monad_of_abind_ret.join /Fun /= /Monad_of_bind_ret.fmap /=.
+rewrite imfset_set1 /= big_imfset /= big_seq_fset1 /=.
+by rewrite big_seq_fset1.
+move=> x /= y.
+by rewrite !inE => /eqP -> /eqP ->.*)
 rewrite /Bind /=; apply/fsetP => /= x; rewrite inE; apply/bigfcupP'/eqP.
 - by case => /= x0 /imfsetP[/= x1]; rewrite inE => /eqP _ ->; rewrite inE => /eqP.
 - move=> -> /=; exists [fset (tt, s')]; last by rewrite inE.
-  by apply/imfsetP => /=; exists (tt, s) => //; rewrite inE.
+  by apply/imfsetP => /=; exists (tt, s) => //; rewrite inE.*)
 Qed.
 Next Obligation.
 move=> s; extensionality s'.
