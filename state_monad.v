@@ -23,24 +23,24 @@ Unset Printing Implicit Defensive.
 Module MonadState.
 Record mixin_of S (M : monad) : Type := Mixin {
   get : M S ;
-  put : S -> M unit ;
+  put : S -> M unit_choiceType ;
   _ : forall s s', put s >> put s' = put s' ;
   _ : forall s, put s >> get = put s >> Ret s ;
   _ : get >>= put = skip ;
-  _ : forall (A : Type) (k : S -> S -> M A),
+  _ : forall (A : choiceType) (k : S -> S -> M A),
     get >>= (fun s => get >>= k s) = get >>= fun s => k s s
 }.
-Record class_of S (m : Type -> Type) := Class {
+Record class_of S (m : choiceType -> choiceType) := Class {
   base : Monad.class_of m ; mixin : mixin_of S (Monad.Pack base) }.
-Structure t S : Type := Pack { m : Type -> Type ; class : class_of S m }.
+Structure t S : Type := Pack { m : choiceType -> choiceType ; class : class_of S m }.
 (* inheritance *)
 Definition baseType S (M : t S) := Monad.Pack (base (class M)).
 Module Exports.
 Definition Get S (M : t S) : m M S :=
   let: Pack _ (Class _ (Mixin x _ _ _ _ _)) := M return m M S in x.
 Arguments Get {S M} : simpl never.
-Definition Put S (M : t S) : S -> m M unit :=
-  let: Pack _ (Class _ (Mixin _ x _ _ _ _)) := M return S -> m M unit in x.
+Definition Put S (M : t S) : S -> m M unit_choiceType :=
+  let: Pack _ (Class _ (Mixin _ x _ _ _ _)) := M return S -> m M unit_choiceType in x.
 Arguments Put {S M} : simpl never.
 Notation stateMonad := t.
 Coercion baseType : stateMonad >-> monad.
@@ -50,7 +50,7 @@ End MonadState.
 Export MonadState.Exports.
 
 Section state_lemmas.
-Variables (S : Type) (M : stateMonad S).
+Variables (S : choiceType) (M : stateMonad S).
 Lemma putput s s' : Put s >> Put s' = Put s' :> M _.
 Proof. by case: M => m [[[? ? ? ? []]]]. Qed.
 Lemma putget s : Put s >> Get = Put s >> Ret s :> M _.
@@ -69,7 +69,7 @@ Proof. by rewrite putget bindA bindretf. Qed.
 Definition overwrite {A S} {M : stateMonad S} s a : M A :=
   Put s >> Ret a.
 
-Example test_nonce0 (M : stateMonad nat) : M nat :=
+Example test_nonce0 (M : stateMonad nat_choiceType) : M nat_choiceType :=
   Get >>= (fun s => Put s.+1 >> Ret s).
 (*Reset test_nonce0.
 Fail Check test_nonce0.*)
@@ -77,16 +77,16 @@ Fail Check test_nonce0.*)
 Module MonadRun.
 Record mixin_of S (M : monad) : Type := Mixin {
   run : forall A, M A -> S -> A * S ;
-  _ : forall A (a : A) s, run (Ret a) s = (a, s) ;
+  _ : forall (A : choiceType) (a : A) s, run (Ret a) s = (a, s) ;
   _ : forall A B (m : M A) (f : A -> M B) s,
       run (do a <- m ; f a) s =
       let: (a', s') := run m s in run (f a') s'
 }.
-Record class_of S (m : Type -> Type) := Class {
+Record class_of S (m : choiceType -> choiceType) := Class {
   base : Monad.class_of m ;
   mixin : mixin_of S (Monad.Pack base)
 }.
-Structure t S : Type := Pack { m : Type -> Type ;
+Structure t S : Type := Pack { m : choiceType -> choiceType ;
   class : class_of S m }.
 Definition baseType S (M : t S) := Monad.Pack (base (class M)).
 Module Exports.
@@ -103,7 +103,7 @@ Export MonadRun.Exports.
 
 Section run_lemmas.
 Variables (S : Type) (M : runMonad S).
-Lemma runret : forall A (a : A) s, Run (Ret a : M _) s = (a, s).
+Lemma runret : forall (A : choiceType) (a : A) s, Run (Ret a : M _) s = (a, s).
 Proof. by case: M => m [? []]. Qed.
 Lemma runbind : forall A B (ma : M A) (f : A -> M B) s,
   Run (do a <- ma ; f a) s = let: (a', s') := Run ma s in Run (f a') s'.
@@ -111,16 +111,16 @@ Proof. by case: M => m [? []]. Qed.
 End run_lemmas.
 
 Module MonadStateRun.
-Record mixin_of S (M : runMonad S) (get : M S) (put : S -> M unit) : Type := Mixin {
+Record mixin_of (S : choiceType) (M : runMonad S) (get : M S) (put : S -> M unit_choiceType) : Type := Mixin {
   _ : forall s, Run get s = (s, s) ;
   _ : forall s s', Run (put s') s = (tt, s') ;
 }.
-Record class_of S (m : Type -> Type) := Class {
+Record class_of S (m : choiceType -> choiceType) := Class {
   base : MonadState.class_of S m ;
   base2 : MonadRun.mixin_of S (Monad.Pack (MonadState.base base)) ;
   mixin : @mixin_of S (MonadRun.Pack (MonadRun.Class base2)) (@Get _ (MonadState.Pack base)) (@Put _ (MonadState.Pack base)) ;
 }.
-Structure t S : Type := Pack { m : Type -> Type ;
+Structure t S : Type := Pack { m : choiceType -> choiceType ;
   class : class_of S m }.
 Definition baseType S (M : t S) := MonadState.Pack (base (class M)).
 Module Exports.
@@ -135,7 +135,7 @@ End MonadStateRun.
 Export MonadStateRun.Exports.
 
 Section staterun_lemmas.
-Variables (S : Type) (M : stateRunMonad S).
+Variables (S : choiceType) (M : stateRunMonad S).
 Lemma runget : forall s, Run (Get : M _) s = (s, s).
 Proof. by case: M => m [? ? []]. Qed.
 Lemma runput : forall s s', Run (Put s' : M _) s = (tt, s').
@@ -149,12 +149,12 @@ Record mixin_of (M : nondetMonad) : Type := Mixin {
   (* composition distributes rightwards over choice *)
   _ : BindLaws.bind_right_distributive (@Bind M) [~p]
 }.
-Record class_of S (m : Type -> Type) : Type := Class {
+Record class_of S (m : choiceType -> choiceType) : Type := Class {
   base : MonadNondet.class_of m ;
   base2 : MonadState.mixin_of S (MonadFail.baseType (MonadNondet.baseType (MonadNondet.Pack base))) ;
   mixin : mixin_of (MonadNondet.Pack base)
 }.
-Structure t S : Type := Pack { m : Type -> Type ; class : class_of S m }.
+Structure t S : Type := Pack { m : choiceType -> choiceType ; class : class_of S m }.
 Definition baseType S (M : t S) := MonadNondet.Pack (base (class M)).
 Module Exports.
 Notation nondetStateMonad := t.
@@ -168,7 +168,7 @@ End MonadNondetState.
 Export MonadNondetState.Exports.
 
 Section nondetstate_lemmas.
-Variables (S : Type) (M : nondetStateMonad S).
+Variables (S : choiceType) (M : nondetStateMonad S).
 Lemma bindmfail : BindLaws.right_zero (@Bind M) (@Fail _).
 Proof. by case: M => m [? ? [? ?]]. Qed.
 Lemma alt_bindDr : BindLaws.bind_right_distributive (@Bind M) (@Alt _).
@@ -181,9 +181,9 @@ Proof. by rewrite -{2}(bindskipf m) -bindA getputskip 2!bindskipf. Qed.
 
 Section state_commute.
 
-Variables (S : Type) (M : nondetStateMonad S).
+Variables (S : choiceType) (M : nondetStateMonad S).
 
-Lemma puttselectC (x : S) A (s : seq A) B (f : _ -> M B) :
+Lemma puttselectC (x : S) (A : choiceType) (s : seq A) B (f : _ -> M B) :
   Put x >> (do rs <- tselect s; f rs) =
   do rs <- tselect s; Put x >> f rs.
 Proof.
@@ -197,7 +197,7 @@ congr (_ [~] _); first by rewrite 2!bindretf.
 rewrite 2!bindA IH; bind_ext => y; by rewrite !bindretf.
 Qed.
 
-Lemma putselectC (x : S) A (s : seq A) B (f : A * (seq A) -> M B) :
+Lemma putselectC (x : S) (A : choiceType) (s : seq A) B (f : A * (seq A) -> M B) :
   Put x >> (do rs <- select s; f rs) = do rs <- select s; Put x >> f rs.
 Proof.
 rewrite selectE {1}fmapE.
@@ -206,7 +206,7 @@ rewrite puttselectC [in RHS]fmapE bindA.
 bind_ext => x0; by rewrite 2!bindretf.
 Qed.
 
-Lemma gettselectC A (s : seq A) B (f : _ -> _ -> M B) :
+Lemma gettselectC (A : choiceType) (s : seq A) B (f : _ -> _ -> M B) :
   do ini <- Get; do rs <- tselect s; f rs ini =
   do rs <- tselect s; do ini <- Get; f rs ini.
 Proof.
@@ -230,7 +230,7 @@ rewrite bindA; bind_ext => y; by rewrite bindretf.
 Qed.
 
 (* perms is independent of the state and so commutes with put *)
-Lemma putpermsC (x : S) A (s : seq A) B (f : _ -> M B) :
+Lemma putpermsC (x : S) (A : choiceType) (s : seq A) B (f : _ -> M B) :
   Put x >> (do rs <- perms s; f rs) =
   do rs <- perms s; Put x >> f rs.
 Proof.
@@ -245,7 +245,7 @@ rewrite IH //.
 by do 2! rewrite_ bindretf.
 Qed.
 
-Lemma getpermsC A (s : seq A) B (f : _ -> _ -> M B) :
+Lemma getpermsC (A : choiceType) (s : seq A) B (f : _ -> _ -> M B) :
   do ini <- Get; (do rs <- perms s; f rs ini) =
   do rs <- perms s; do ini <- Get; f rs ini.
 Proof.
@@ -272,15 +272,15 @@ End state_commute.
 Definition nondetState_sub {S} {M : nondetStateMonad S} {A} (n : M A) : Type :=
   {m | ndDenote m = n}.
 
-Lemma select_is_nondetState S (M : nondetStateMonad S) A (s : seq A) :
+Lemma select_is_nondetState S (M : nondetStateMonad S) (A : choiceType) (s : seq A) :
   nondetState_sub (select s : M _).
 Proof.
 elim: s => [/= | u v [x /= <-]]; first by exists (@ndFail _).
 by exists (ndAlt (ndRet (u, v)) (ndBind x (fun x => ndRet (x.1, u :: x.2)))).
 Qed.
 
-Lemma unfoldM_is_nondetState S (M : nondetStateMonad S) A B
-  (f : seq B -> M (A * seq B)%type) :
+Lemma unfoldM_is_nondetState S (M : nondetStateMonad S) (A B : choiceType)
+  (f : seq B -> M [choiceType of A * seq B]) :
   (forall s, nondetState_sub (f s)) -> bassert_size f ->
   forall s, nondetState_sub (unfoldM (@well_founded_size B) (@nilp _) f s).
 Proof.
@@ -348,21 +348,21 @@ Qed.
 (* section 4.2, mu2017 *)
 Section loop.
 
-Variables (A S : Type) (M : stateMonad S) (op : S -> A -> S).
+Variables (A : Type) (S : choiceType) (M : stateMonad S) (op : S -> A -> S).
 
 Local Open Scope mu_scope.
 
 Definition opmul x m : M _ :=
   Get >>= fun st => let st' := op st x in fmap (cons st') (Put st' >> m).
 
-Definition loopp s xs : M (seq S) :=
+Definition loopp s xs : M [choiceType of seq S] :=
   let mul x m := opmul x m in Put s >> foldr mul (Ret [::]) xs.
 
 Lemma loopp_nil s : loopp s [::] = Put s >> Ret [::].
 Proof. by []. Qed.
 
 Lemma loopp_of_scanl_helper s
-  (ms : M S) (mu mu' : M unit) (m : M (seq S)) (f : S -> M unit) :
+  (ms : M S) (mu mu' : M unit_choiceType) (m : M [choiceType of seq S]) (f : S -> M unit_choiceType) :
   do x <- ms; mu >> (do xs <- fmap (cons s) (mu' >> m); f x >> Ret xs) =
   fmap (cons s) (do x <- ms; mu >> mu' >> (do xs <- m; f x >> Ret xs)).
 Proof.
@@ -411,8 +411,8 @@ End loop.
 
 Section section_51. (* mu2017 *)
 
-Variables (S : Type) (M : nondetStateMonad S).
-Variables (A : Type) (op : S -> A -> S) (ok : pred S).
+Variables (S : choiceType) (M : nondetStateMonad S).
+Variables (A : choiceType) (op : S -> A -> S) (ok : pred S).
 
 Lemma assert_all_scanl s (xs : seq A) :
   assert (all ok \o scanl op s) xs =
@@ -466,7 +466,7 @@ Qed.
 Let B := A.
 Let res := @cons A.
 
-Definition opdot (a : A) (m : M (seq B)) : M (seq B) :=
+Definition opdot (a : A) (m : M [choiceType of seq B]) : M [choiceType of seq B] :=
   Get >>= (fun st => guard (ok (op st a)) >> Put (op st a) >> fmap (res a) m).
 
 (* mu2017 *)
@@ -533,12 +533,12 @@ Lemma intersect0s (A : eqType) (s : seq A) : intersect [::] s = [::].
 Proof. by elim: s. Qed.
 
 Module MonadFresh.
-Record mixin_of (S : eqType) (m : Type -> Type) : Type := Mixin {
+Record mixin_of (S : choiceType) (m : choiceType -> choiceType) : Type := Mixin {
   fresh : m S }.
-Record class_of S (m : Type -> Type) : Type := Class {
+Record class_of S (m : choiceType -> choiceType) : Type := Class {
   base : Monad.class_of m ;
   mixin : mixin_of S m }.
-Structure t S := Pack { m : Type -> Type ; class : class_of S m }.
+Structure t S := Pack { m : choiceType -> choiceType ; class : class_of S m }.
 Definition baseType S (M : t S) := Monad.Pack (base (class M)).
 Module Exports.
 Definition Fresh S (M : t S) : m M S :=
@@ -571,12 +571,12 @@ Lemma segment_closed_prefix A (p : segment_closed.t A) s :
 Proof. move=> ps t; apply: contra ps; by case/segment_closed.H. Qed.
 
 (* assert p distributes over concatenation *)
-Definition promote_assert (M : failMonad) A
+Definition promote_assert (M : failMonad) (A : choiceType)
   (p : pred (seq A)) (q : pred (seq A * seq A)) :=
   (bassert p) \o (M # ucat) \o mpair =
   (M # ucat) \o (bassert q) \o mpair \o (bassert p)^`2 :> (_ -> M _).
 
-Lemma promote_assert_sufficient_condition (M : failMonad) A :
+Lemma promote_assert_sufficient_condition (M : failMonad) (A : choiceType) :
   BindLaws.right_zero (@Bind M) (@Fail _) ->
   forall (p : segment_closed.t A) q, promotable p q ->
   promote_assert M p q.
@@ -681,16 +681,16 @@ Record mixin_of S (M : failMonad) (fresh : M S) : Type := Mixin {
   (* failure is a right zero of composition (backtracking interpretation) *)
   _ : BindLaws.right_zero (@Bind M) (@Fail _)
 }.
-Record class_of S (m : Type -> Type) := Class {
+Record class_of S (m : choiceType -> choiceType) := Class {
   base : MonadFail.class_of m ;
   mixin : MonadFresh.mixin_of S m ;
   ext : @mixin_of S (MonadFail.Pack base) (MonadFresh.fresh mixin)
 }.
-Structure t S : Type := Pack { m : Type -> Type ; class : class_of S m }.
+Structure t S : Type := Pack { m : choiceType -> choiceType ; class : class_of S m }.
 Definition baseType S (M : t S) := MonadFail.Pack (base (class M)).
 Module Exports.
 Definition Symbols S (M : t S) :=
-  let: Pack _ (Class _ _ (Mixin x _ _ _)) := M return nat -> m M (seq S) in x.
+  let: Pack _ (Class _ _ (Mixin x _ _ _)) := M return nat -> m M [choiceType of seq S] in x.
 Arguments Symbols {S M} : simpl never.
 Definition Distinct S (M : t S) :=
   let: Pack _ (Class _ _ (Mixin _ x _ _)) := M return segment_closed.t S in x.
@@ -708,7 +708,7 @@ End MonadFailFresh.
 Export MonadFailFresh.Exports.
 
 Section failfresh_lemmas.
-Variables (S : eqType) (M : failFreshMonad S).
+Variables (S : choiceType) (M : failFreshMonad S).
 Lemma failfresh_bindmfail : BindLaws.right_zero (@Bind M) (@Fail _).
 Proof. by case: M => m [? ? []]. Qed.
 Lemma bassert_symbols : bassert (Distinct M) \o Symbols = Symbols :> (nat -> M _).
@@ -716,7 +716,7 @@ Proof. by case: M => m [? ? []]. Qed.
 End failfresh_lemmas.
 
 Section properties_of_Symbols.
-Variables (A : eqType) (M : failFreshMonad A).
+Variables (A : choiceType) (M : failFreshMonad A).
 
 Lemma SymbolsE : Symbols = (fun n => sequence (nseq n Fresh)) :> (_ -> M _).
 Proof. by case: M => m [? ? [? ? ? ?]]. Qed.
@@ -769,35 +769,35 @@ End properties_of_Symbols.
 Module MonadArray.
 Record mixin_of S (I : eqType) (M : monad) : Type := Mixin {
   get : I -> M S ;
-  put : I -> S -> M unit ;
+  put : I -> S -> M unit_choiceType ;
   _ : forall i s s', put i s >> put i s' = put i s' ;
-  _ : forall i s (A : Type) (k : S -> M A), put i s >> get i >>= k =
+  _ : forall i s (A : choiceType) (k : S -> M A), put i s >> get i >>= k =
       put i s >> k s ;
   _ : forall i, get i >>= put i = skip ;
-  _ : forall i (A : Type) (k : S -> S -> M A),
+  _ : forall i (A : choiceType) (k : S -> S -> M A),
     get i >>= (fun s => get i >>= k s) = get i >>= fun s => k s s ;
-  _ : forall i j (A : Type) (k : S -> S -> M A),
+  _ : forall i j (A : choiceType) (k : S -> S -> M A),
     get i >>= (fun u => get j >>= (fun v => k u v)) =
     get j >>= (fun v => get i >>= (fun u => k u v)) ;
   _ : forall i j u v, (i != j) \/ (u = v) ->
     put i u >> put j v = put j v >> put i u ;
-  _ : forall i j u (A : Type) (k : S -> M A), i != j ->
+  _ : forall i j u (A : choiceType) (k : S -> M A), i != j ->
     put i u >> get j >>= k =
     get j >>= (fun v => put i u >> k v)
 }.
-Record class_of S (I : eqType) (m : Type -> Type) := Class {
+Record class_of S (I : eqType) (m : choiceType -> choiceType) := Class {
   base : Monad.class_of m ; mixin : mixin_of S I (Monad.Pack base) }.
 Structure t S (I : eqType) : Type :=
-  Pack { m : Type -> Type ; class : class_of S I m }.
+  Pack { m : choiceType -> choiceType ; class : class_of S I m }.
 (* inheritance *)
 Definition baseType S I (M : t S I) := Monad.Pack (base (class M)).
 Module Exports.
 Definition aGet S I (M : t S I) : I -> m M S :=
   let: Pack _ (Class _ (Mixin x _ _ _ _ _ _ _ _)) := M return I -> m M S in x.
 Arguments aGet {S I M} : simpl never.
-Definition aPut S I (M : t S I) : I -> S -> m M unit :=
+Definition aPut S I (M : t S I) : I -> S -> m M unit_choiceType :=
   let: Pack _ (Class _ (Mixin _ x _ _ _ _ _ _ _ )) := M
-    return I -> S -> m M unit in x.
+    return I -> S -> m M unit_choiceType in x.
 Arguments aPut {S I M} : simpl never.
 Notation arrayMonad := t.
 Coercion baseType : arrayMonad >-> monad.
@@ -807,7 +807,7 @@ End MonadArray.
 Export MonadArray.Exports.
 
 Section monadarray_lemmas.
-Variables (S : Type) (I : eqType) (M : arrayMonad S I).
+Variables (S : choiceType) (I : eqType) (M : arrayMonad S I).
 Lemma aputput i s s' : aPut i s >> aPut i s' = aPut i s' :> M _.
 Proof. by case: M => ? [? []]. Qed.
 Lemma aputget i s A (k : S -> M A) : aPut i s >> aGet i >>= k =
@@ -833,15 +833,15 @@ End monadarray_lemmas.
 
 Section monadarray_example.
 
-Variables (M : arrayMonad nat bool_eqType).
+Variables (M : arrayMonad nat_choiceType bool_eqType).
 
-Definition swap : M unit :=
+Definition swap : M unit_choiceType :=
   do x <- aGet false ;
   do y <- aGet true ;
   aPut false y >>
   aPut true x.
 
-Definition does_swap (m : M unit) :=
+Definition does_swap (m : M unit_choiceType) :=
   (do x <- aGet false ;
    do y <- aGet true ;
    m >>
@@ -849,7 +849,7 @@ Definition does_swap (m : M unit) :=
    do y' <- aGet true ;
    Ret ((x == y') && (y == x'))).
 
-Lemma swapP (m : M unit) :
+Lemma swapP (m : M unit_choiceType) :
   does_swap swap = swap >> Ret true.
 Proof.
 rewrite /swap /does_swap.
