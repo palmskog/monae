@@ -4,9 +4,10 @@ From mathcomp Require Import eqtype ssrnat seq choice fintype tuple finset.
 
 From infotheo Require Import ssr_ext ssrR Reals_ext dist.
 
+(* TODO : check if this Reserved Notation is needed *)
 Reserved Notation "x <| p |> y" (format "x  <| p |>  y", at level 50).
 
-(* wip:
+(*
   This file duplicates the hierarchy of monads using
   functor of type choiceType -> choiceType instead of Type -> Type.
   The intent is to be able to use MathComp-compatible libraries

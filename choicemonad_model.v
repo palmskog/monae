@@ -11,10 +11,12 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-(* wip:
+(*
   This file provides models:
-  - for the nondeterministic-state monad TODO
-  - for the probability monad
+  - for the nondeterministic-state monad
+  - for the probability monad.
+      depends on the formalization of distributions from the infotheo library
+      (https://github.com/affeldt-aist/infotheo).
 *)
 
 Section axioms.
@@ -64,17 +66,6 @@ Module ModelBacktrackableState.
 Local Open Scope fset_scope.
 
 Section monad.
-(*
-Variable S : finType.
-Local Obligation Tactic := try by [].
-
-Program Definition _monad : choicemonad := @choiceMonad.Pack _
-(@choiceMonad.Class (fun A : choiceType => [choiceType of {ffun S -> {fset (A * S)}}])
-(fun A (a : A) => [ffun s => [fset (a, s)]]) (* ret *)
-(fun A B m (f : A -> {ffun S -> {fset (B * S)}}) =>
-     [ffun s => \bigcup_(i <- (fun x => f x.1 x.2) @` (m s)) i]) (* bind *)
-_ _ _).
-*)
 Variable S : choiceType.
 Local Obligation Tactic := try by [].
 
@@ -101,11 +92,11 @@ move=> A B C /= m f g; extensionality s.
 apply/fsetP => /= x; apply/bigfcupP'/bigfcupP'; case => /= CS  /imfsetP[/=].
 - move=> bs /bigfcupP'[/= BS]  /imfsetP[/= sa] sams ->{BS} bsfsa ->{CS} xgbs.
   exists (\bigcup_(i <- [fset g x0.1 x0.2 | x0 in f sa.1 sa.2]) i).
-    by   apply/imfsetP => /=; exists sa.
-  apply/bigfcupP'; exists (g bs.1 bs.2) => //;   by apply/imfsetP => /=; exists bs.
+    by apply/imfsetP => /=; exists sa.
+  apply/bigfcupP'; exists (g bs.1 bs.2) => //; by apply/imfsetP => /=; exists bs.
 - move=> sa sams ->{CS} /bigfcupP'[/= CS]  /imfsetP[/= bs] bsfsa ->{CS} xgbs.
-  exists (g bs.1 bs.2) => //;   apply/imfsetP => /=; exists bs => //.
-  apply/bigfcupP' => /=; exists (f sa.1 sa.2) => //;   by apply/imfsetP => /=; exists sa.
+  exists (g bs.1 bs.2) => //; apply/imfsetP => /=; exists bs => //.
+  apply/bigfcupP' => /=; exists (f sa.1 sa.2) => //; by apply/imfsetP => /=; exists sa.
 Qed.
 End monad.
 
@@ -122,35 +113,35 @@ _ _ _ _))).
 Next Obligation.
 move=> s s'; extensionality s''.
 rewrite /Bind /=; apply/fsetP => /= x; rewrite inE; apply/bigfcupP'/eqP.
-- by case => /= x0  /imfsetP[/= x1]; rewrite inE => /eqP _ ->; rewrite inE => /eqP.
+- by case => /= x0 /imfsetP[/= x1]; rewrite inE => /eqP _ ->; rewrite inE => /eqP.
 - move=> -> /=; exists [fset (tt, s')]; last by rewrite inE.
-  by   apply/imfsetP => /=; exists (tt, s) => //; rewrite inE.
+  by apply/imfsetP => /=; exists (tt, s) => //; rewrite inE.
 Qed.
 Next Obligation.
 move=> s; extensionality s'.
 rewrite /Bind /=; apply/fsetP => /= x; apply/bigfcupP'/bigfcupP'.
-- case => /= x0  /imfsetP[/= x1]; rewrite inE => /eqP -> ->; rewrite inE /= => /eqP ->.
+- case => /= x0 /imfsetP[/= x1]; rewrite inE => /eqP -> ->; rewrite inE /= => /eqP ->.
   exists [fset (s, s)]; last by rewrite inE.
     apply/imfsetP => /=; exists (tt, s) => //; by rewrite inE.
-- case => /= x0  /imfsetP[/= x1]; rewrite inE => /eqP -> ->; rewrite inE => /eqP ->.
+- case => /= x0 /imfsetP[/= x1]; rewrite inE => /eqP -> ->; rewrite inE => /eqP ->.
   exists [fset (s ,s)]; last by rewrite inE.
-  by   apply/imfsetP => /=; exists (tt, s) => //; rewrite inE.
+  by apply/imfsetP => /=; exists (tt, s) => //; rewrite inE.
 Qed.
 Next Obligation.
 extensionality s.
 rewrite /Bind /skip /= /Ret; apply/fsetP => /= x; apply/bigfcupP'/idP.
-- by case => /= x0  /imfsetP[/= x1]; rewrite inE => /eqP -> ->; rewrite inE.
+- by case => /= x0 /imfsetP[/= x1]; rewrite inE => /eqP -> ->; rewrite inE.
 - rewrite inE => /eqP ->; exists [fset (tt, s)]; last by rewrite inE.
-    apply/imfsetP; exists (s, s) => //; by rewrite inE.
+  apply/imfsetP; exists (s, s) => //; by rewrite inE.
 Qed.
 Next Obligation.
 move=> k; extensionality s; rewrite /Bind /=; apply/fsetP => x; apply/bigfcupP'/bigfcupP'.
 - case => /= x0  /imfsetP[/= x1]; rewrite inE => /eqP -> -> /bigfcupP'[/= x2]  /imfsetP[/= x3].
   rewrite inE => /eqP -> /= -> xkss.
-  exists (k s s s) => //;   apply/imfsetP; exists (s, s) => //; by rewrite inE.
-- case => /= x0  /imfsetP[/= x1]; rewrite inE => /eqP -> -> /= xksss.
+  exists (k s s s) => //; apply/imfsetP; exists (s, s) => //; by rewrite inE.
+- case => /= x0 /imfsetP[/= x1]; rewrite inE => /eqP -> -> /= xksss.
   exists (\bigcup_(i <- [fset k (s, s).1 x2.1 x2.2 | x2 in [fset ((s, s).2, (s, s).2)]]) i).
-      apply/imfsetP; exists (s, s) => //; by rewrite inE.
+    apply/imfsetP; exists (s, s) => //; by rewrite inE.
   apply/bigfcupP'; exists (k s s s) => //;   apply/imfsetP; exists (s, s) => //=; by rewrite inE.
 Qed.
 
@@ -163,7 +154,7 @@ Program Definition _fail : choicefailMonad := @choiceMonadFail.Pack _
     (@choiceMonadFail.Mixin _ (fun (A : choiceType) (_ : S) => fset0) _)).
 Next Obligation.
 move=> A B g; extensionality s; apply/fsetP => x; rewrite inE /Bind; apply/negbTE.
-apply/bigfcupP'; case => /= x0  /imfsetP[/= sa]; by rewrite inE.
+apply/bigfcupP'; case => /= x0 /imfsetP[/= sa]; by rewrite inE.
 Qed.
 
 End fail.
@@ -180,9 +171,9 @@ Next Obligation. by move=> A a b c; extensionality s; rewrite fsetUA. Qed.
 Next Obligation.
 move=> A B /= m1 m2 k; extensionality s; rewrite /Bind /=.
 apply/fsetP => /= bs; rewrite !inE; apply/bigfcupP'/orP.
-- case => /= BS  /imfsetP[/= sa]; rewrite inE => /orP[sam1s ->{BS} Hbs|sam2s ->{BS} Hbs].
-  + left; apply/bigfcupP' => /=; exists (k sa.1 sa.2) => //;   apply/imfsetP; by exists sa.
-  + right; apply/bigfcupP' => /=; exists (k sa.1 sa.2) => //;   apply/imfsetP; by exists sa.
+- case => /= BS /imfsetP[/= sa]; rewrite inE => /orP[sam1s ->{BS} Hbs|sam2s ->{BS} Hbs].
+  + left; apply/bigfcupP' => /=; exists (k sa.1 sa.2) => //; apply/imfsetP; by exists sa.
+  + right; apply/bigfcupP' => /=; exists (k sa.1 sa.2) => //; apply/imfsetP; by exists sa.
 - case => /bigfcupP'[/= BS /imfsetP[/= sa sams ->{BS} bsksa]].
   by exists (k sa.1 sa.2) => //; apply/imfsetP; exists sa => //; rewrite inE sams.
   by exists (k sa.1 sa.2) => //; apply/imfsetP; exists sa => //; rewrite inE sams orbT.
