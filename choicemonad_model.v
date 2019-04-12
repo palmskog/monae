@@ -103,6 +103,18 @@ Section state.
 Variable S : choiceType.
 Local Obligation Tactic := try by [].
 
+Lemma BindE1 (s s' s'' : S) :
+  (((fun _ : S => [fset (tt, s)]) : (_monad S) _) >>
+   (fun _ : S => [fset (tt, s')])) s'' =
+  \big[fsetU/fset0]_(i <- [fset [fset (tt, s')] | _ in [fset (tt, s)]]) i.
+Proof.
+rewrite /Bind /= /Join /= /Monad_of_bind_ret.join /= !imfset_set1.
+apply congr_big => //=.
+rewrite /Fun /= /Monad_of_bind_ret.fmap big_imfset /=.
+  by rewrite big_seq_fset1 /= imfset_set1.
+by move=> -[x1 x2] -[y1 y2] /=; rewrite !in_fset1 => /eqP[-> ->] /eqP[-> ->].
+Qed.
+
 Program Definition _state : stateMonad S :=
 (@MonadState.Pack _ _
   (@MonadState.Class _ _ (Monad.class (_monad S)) (@MonadState.Mixin _ _
@@ -111,15 +123,10 @@ Program Definition _state : stateMonad S :=
 _ _ _ _))).
 Next Obligation.
 move=> s s'; extensionality s''.
-(*rewrite /Bind /Join /= /Monad_of_abind_ret.join /Fun /= /Monad_of_bind_ret.fmap /=.
-rewrite imfset_set1 /= big_imfset /= big_seq_fset1 /=.
-by rewrite big_seq_fset1.
-move=> x /= y.
-by rewrite !inE => /eqP -> /eqP ->.*)
-rewrite /Bind /=; apply/fsetP => /= x; rewrite inE; apply/bigfcupP'/eqP.
+rewrite BindE1; apply/fsetP => /= x; rewrite inE; apply/bigfcupP'/eqP.
 - by case => /= x0 /imfsetP[/= x1]; rewrite inE => /eqP _ ->; rewrite inE => /eqP.
 - move=> -> /=; exists [fset (tt, s')]; last by rewrite inE.
-  by apply/imfsetP => /=; exists (tt, s) => //; rewrite inE.*)
+  by apply/imfsetP => /=; exists (tt, s) => //; rewrite inE.
 Qed.
 Next Obligation.
 move=> s; extensionality s'.
