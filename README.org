@@ -21,8 +21,6 @@ Other reference:
 - [[trace_monad.v][trace_monad.v]]: about the state-trace monad
 - [[monad_composition.v][monad_composition.v]]: composing monads
 - [[monad_model.v][monad_model.v]]: concrete models of monads
-- [[relmonad.v][relmonad.v]]: a relative monad hierarchy with finType
-- [[relmonad_model.v][relmonad_model.v]]: models of the backtrackable-state and the probability monads
 - [[altprob_model.v][altprob_model.v]]: model of combined choice
 - [[example_spark.v][example_spark.v]]: example of Spark aggregation
 - [[example_nqueens.v][example_nqueens.v]]: example of the n-queens puzzle

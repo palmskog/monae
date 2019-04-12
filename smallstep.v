@@ -5,6 +5,7 @@
 
 Require Import Eqdep JMeq List ssreflect.
 Import ListNotations.
+From mathcomp Require Import choice.
 
 Set Universe Polymorphism.
 Unset Universe Minimization ToSet.
@@ -21,24 +22,24 @@ Reserved Notation "'p_do' x : T <- m ; e"
 
 Section Syntax.
 
-Variables T S : Type.
+Variables (T : Type) (S : choiceType).
 
-Inductive program : Type -> Type :=
-| p_ret  : forall {A}, A -> program A
+Inductive program : choiceType -> Type :=
+| p_ret  : forall {A : choiceType}, A -> program A
 | p_bind : forall {A B}, program A -> (A -> program B) -> program B
 | p_cond : forall {A}, bool -> program A -> program A -> program A
-| p_repeat : nat -> program unit -> program unit
-| p_while : nat -> (S -> bool) -> program unit -> program unit
+| p_repeat : nat -> program unit_choiceType -> program unit_choiceType
+| p_while : nat -> (S -> bool) -> program unit_choiceType -> program unit_choiceType
 | p_get  : program S
-| p_put  : S -> program unit
-| p_mark : T -> program unit.
+| p_put  : S -> program unit_choiceType
+| p_mark : T -> program unit_choiceType.
 
 Local Notation "'p_do' x <- m ; e" := (p_bind m (fun x => e)).
 Local Notation "'p_do' x : T <- m ; e" :=(p_bind m (fun x : T => e)).
 
 Inductive continuation : Type :=
 | stop : forall (A : Type), A -> continuation
-| cont : forall (A : Type), program A -> (A -> continuation) -> continuation.
+| cont : forall (A : choiceType), program A -> (A -> continuation) -> continuation.
 
 End Syntax.
 
@@ -62,17 +63,17 @@ Notation "p `; k" := (@cont _ _ _ p k) (at level 50).
 
 Section OperationalSemantics.
 
-Variables T S : Type.
+Variables (T : Type) (S : choiceType).
 
 Definition state : Type := S * @continuation T S.
 
 Inductive step : state -> option T -> state -> Prop :=
-| s_ret  : forall s A a (k : A -> _), step (s, p_ret a `; k) None (s, k a)
-| s_bind : forall s A B p (f : A -> program B) k,
+| s_ret  : forall s (A : choiceType) a (k : A -> _), step (s, p_ret a `; k) None (s, k a)
+| s_bind : forall s (A : choiceType) B p (f : A -> program B) k,
   step (s, p_bind p f `; k) None (s, p `; fun a => f a `; k)
-| s_cond_true : forall s A p1 p2 (k : A -> _),
+| s_cond_true : forall s (A : choiceType) p1 p2 (k : A -> _),
   step (s, p_cond true p1 p2 `; k) None (s, p1 `; k)
-| s_cond_false : forall s A p1 p2 (k : A -> _),
+| s_cond_false : forall s (A : choiceType) p1 p2 (k : A -> _),
   step (s, p_cond false p1 p2 `; k) None (s, p2 `; k)
 | s_repeat_O : forall s p k, step (s, p_repeat O p `; k) None (s, k tt)
 | s_repeat_S : forall s n p k,
@@ -235,7 +236,7 @@ subst.
 repeat split.
 Qed.
 
-Definition run_s {A : Type} (p : program A) (f : A -> continuation) (s : S) :
+Definition run_s {A : choiceType} (p : program A) (f : A -> continuation) (s : S) :
   {o & {f' & {s' | step (s, p `; f) o (s', f') } } }.
 Proof.
 destruct p as [ A a | A B p g | A b p1 p2 | n p | fuel c p | | s' | t ];
@@ -252,7 +253,7 @@ destruct p as [ A a | A B p g | A b p1 p2 | n p | fuel c p | | s' | t ];
 Defined.
 
 Definition run_s_n (n : nat)
-  {A : Type} (p : program A) (f : A -> continuation) (s : S) :
+  {A : choiceType} (p : program A) (f : A -> continuation) (s : S) :
   option {l & {f' & {s' | step_n n (s, p `; f) l (s', f') } } }.
 Proof.
 revert n A p f s.
@@ -285,7 +286,7 @@ intros [ | n' ] A p f s.
 Defined.
 
 Definition run_gen
-  {A : Type} (p : program A) (f : A -> continuation) (s : S) :
+  {A : choiceType} (p : program A) (f : A -> continuation) (s : S) :
   {l & {a : A & {s' | step_star (s, p `; f) l (s', f a) } } }.
 Proof.
 revert f s.
@@ -345,7 +346,7 @@ induction p as [ A a | A B p IHp g IHg | A b p1 IHp1 p2 IHp2 |
   abstract (eapply ss_step_Some; [ apply s_mark | apply ss_refl ]).
 Defined.
 
-Definition run_ss {A : Type} (p : program A) (s : S) :
+Definition run_ss {A : choiceType} (p : program A) (s : S) :
   {l & {a : A & {s' |
   step_star (s, p `; stop A) l (s', stop A a) } } } :=
   run_gen p (stop A) s.

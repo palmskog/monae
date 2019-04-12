@@ -6,18 +6,18 @@
 Require Import ssreflect ssrfun ssrbool FunctionalExtensionality Eqdep List.
 Import ListNotations.
 Require Import monad state_monad trace_monad smallstep.
-From mathcomp Require Import seq.
+From mathcomp Require Import seq choice.
 
 Set Bullet Behavior "Strict Subproofs".
 
 Section DenotationalSemantics.
 
-Variables S T : Type.
+Variables (S : choiceType) (T : Type).
 Variable M : stateTraceRunMonad S T.
 
-Fixpoint denote {A : Type} (p : program A) : M A :=
+Fixpoint denote {A : choiceType} (p : program A) : M A :=
   match p with
-  | p_ret _ v => Ret v
+  | p_ret A v => Ret v
   | p_bind _ _ m f => do a <- denote m; denote (f a)
   | p_cond _ b p1 p2 => if b then denote p1 else denote p2
   | p_repeat n p => (fix loop (m : nat) : M unit :=

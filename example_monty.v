@@ -198,7 +198,7 @@ move: (Set3.another_notin card_door h h); apply: contra; by rewrite !inE => ->.
 Qed.
 
 Definition monty {M : monad} (hide pick : M door)
-  (tease strategy : door -> door -> M door) : M bool :=
+  (tease strategy : door -> door -> M door) : M bool_choiceType :=
   do h <- hide ;
   do p <- pick ;
   do t <- tease h p ;
@@ -225,7 +225,7 @@ Definition switch {N : monad} (p t : door) : N door := Ret (head (doors \\ [:: p
 
 Definition stick {N : monad} (p t : door) : N door := Ret p.
 
-Definition play (strategy : door -> door -> M door) : M bool :=
+Definition play (strategy : door -> door -> M door) : M bool_choiceType :=
   monty hide pick tease strategy.
 
 Lemma play_strategy strategy : play strategy =
@@ -258,7 +258,7 @@ Qed.
 
 (* matching choices: the doors h and p independently chosen at random
    will match one third of the time *)
-Lemma bcoin13E (f : bool -> M bool) :
+Lemma bcoin13E (f : bool -> M bool_choiceType) :
   do hp <- uniform (def, def) (cp doors doors); f (hp.1 == hp.2) =
   do b <- bcoin (`Pr /3); f b.
 Proof.
@@ -360,7 +360,7 @@ Variable M : altProbMonad.
 Definition hide_n : M door := arbitrary A doors.
 Definition tease_n (h p : door) : M door := arbitrary A (doors \\ [:: h; p]).
 Let pick : M door := @pick _.
-Definition play_n (strategy : door -> door -> M door) : M bool :=
+Definition play_n (strategy : door -> door -> M door) : M bool_choiceType :=
   monty hide_n pick tease_n strategy.
 
 Lemma monty_choice_your_choice_combine :
@@ -422,7 +422,7 @@ Let unif_door : _ -> M _ := @uniform _ _ def.
 Definition tease_f (h p : door) : M door :=
   do t <- unif_door (doors \\ [:: p]); if t == h then Fail else Ret t.
 
-Definition play_f (strategy : door -> door -> M door) : M bool :=
+Definition play_f (strategy : door -> door -> M door) : M bool_choiceType :=
   monty hide pick tease_f strategy.
 
 Lemma tease_fE (h p : door) : let d := head def (doors \\ [:: h; p]) in
