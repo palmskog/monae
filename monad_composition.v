@@ -16,8 +16,8 @@ Module Comp.
 Section comp.
 Variables (M N : monad).
 Definition F : functor (*(M \o N)*) := FComp M N.
-Definition ret A : A -> FComp M N A := Ret \o Ret.
-Lemma fmap_ret (A B : Type) (h : A -> B) : (F # h) \o (@ret _) = (@ret _) \o h.
+Definition ret (A : choiceType) : A -> FComp M N A := Ret \o Ret.
+Lemma fmap_ret (A B : choiceType) (h : A -> B) : (F # h) \o (@ret _) = (@ret _) \o h.
 Proof.
 rewrite /ret.
 rewrite -[in RHS]compA.
@@ -39,7 +39,7 @@ Arguments prod {A}.
 Definition JOIN A : Comp.F M N (Comp.F M N A) -> Comp.F M N A := Join \o M # prod.
 Arguments JOIN {A}.
 
-Definition prod1 := forall A B (f : A -> B), prod \o _ # (Comp.F M N # f) = Comp.F M N # f \o prod.
+Definition prod1 := forall (A B : choiceType) (f : A -> B), prod \o _ # (Comp.F M N # f) = Comp.F M N # f \o prod.
 Definition prod2 := forall A, prod \o Ret = id :> (_ -> M (N A)).
 Definition prod3 := forall A, prod \o _ # Comp.ret = Ret :> (_ -> M (N A)).
 Definition prod4 := forall A, prod \o _ # JOIN = JOIN \o prod :> (_ -> M (N A)).
@@ -95,7 +95,7 @@ Arguments dorp {A}.
 Definition JOIN A : FComp M N (FComp M N A) -> FComp M N A := _ # Join \o dorp.
 Arguments JOIN {A}.
 
-Definition dorp1 := forall A B (f : A -> B), dorp \o Comp.F M N # (_ # f) = Comp.F M N # f \o dorp.
+Definition dorp1 := forall (A B : choiceType) (f : A -> B), dorp \o Comp.F M N # (_ # f) = Comp.F M N # f \o dorp.
 Definition dorp2 := forall A, (@dorp A) \o Comp.ret = _ # Ret.
 Definition dorp3 := forall A, (@dorp A) \o Comp.F M N # Ret = id.
 Definition dorp4 := forall A, (@dorp A) \o JOIN = JOIN \o Comp.F M N # dorp.
@@ -178,7 +178,7 @@ Proof. by rewrite JOINE. Qed.
 Fact JOIN_dorp A : @JOIN A = _ # Join \o dorp.
 Proof. by rewrite /dorp compA. Qed.
 
-Definition swap1 := forall A B (f : A -> B), swap \o _ # (_ # f) = _ # (_ # f) \o swap .
+Definition swap1 := forall (A B : choiceType) (f : A -> B), swap \o _ # (_ # f) = _ # (_ # f) \o swap .
 Definition swap2 := forall A, @swap A \o Ret = _ # Ret :> (M A -> M (N A)).
 Definition swap3 := forall A, @swap A \o _ # Ret = Ret :> (N A -> M (N A)).
 Definition swap4 := forall A, (@prod A) \o _ # (@dorp _) = (@dorp _) \o (@prod _).

@@ -76,7 +76,7 @@ End list.
 
 Section option.
 Local Obligation Tactic := idtac.
-Program Definition option := @Monad_of_bind_ret option (fun A B (a : option A) (f : A -> option B) =>
+Program Definition option := @Monad_of_bind_ret option_choiceType (fun A B (a : option A) (f : A -> option B) =>
     if a isn't Some x then None else f x) (@Some) _ _ _.
 Next Obligation. by []. Qed.
 Next Obligation. by []. Qed.
@@ -94,8 +94,8 @@ Next Obligation. move=> ? ? ? ? ? ?; exact: bigsetUA. Qed.
 End set.
 
 Section state.
-Variables S T : Type.
-Let m0 := fun A => S * list T -> A * (S * list T).
+Variables (S T : choiceType).
+Let m0 := fun A : choiceType => fun_choiceType [choiceType of S * list T] [choiceType of A * (S * list T)].
 Definition state : monad.
 refine (@Monad_of_bind_ret m0
   (fun A B m f => fun s => let (a, s') := m s in f a s') (* bind *)
@@ -211,7 +211,7 @@ End ModelNondet.
 Module ModelStateTrace.
 
 Section st.
-Variables (S T : Type).
+Variables (S T : choiceType).
 Local Obligation Tactic := idtac.
 Program Definition mk : stateTraceMonad S T :=
 let m := Monad.class (@ModelMonad.state S T) in
@@ -233,7 +233,7 @@ End ModelStateTrace.
 
 Module ModelRun.
 
-Definition mk {S T} : runMonad (S * seq T).
+Definition mk {S T : choiceType} : runMonad (S * seq T).
 set m := @ModelMonad.state S T.
 refine (@MonadRun.Pack _ _ (@MonadRun.Class _ _ (Monad.class m)
   (@MonadRun.Mixin _ m
@@ -249,12 +249,12 @@ End ModelRun.
 
 Module ModelStateTraceRun.
 
-Definition mk {S T} :
+Definition mk {S T : choiceType} :
   stateTraceRunMonad S T.
 refine (let stm := @ModelStateTrace.mk S T in
         let run := @ModelRun.mk S T in
-@MonadStateTraceRun.Pack S T (fun A => S * list T -> A * (S * list T))
-  (@MonadStateTraceRun.Class S T (fun A => S * list T -> A * (S * list T))
+@MonadStateTraceRun.Pack S T (fun A : choiceType => fun_choiceType [choiceType of S * list T] [choiceType of A * (S * list T)])
+  (@MonadStateTraceRun.Class S T (fun A : choiceType => fun_choiceType [choiceType of S * list T] [choiceType of A * (S * list T)])
     (MonadStateTrace.class stm)
     (MonadRun.mixin (MonadRun.class run))
     (@MonadStateTraceRun.Mixin _ _ run _ _ _ _ _ _))).
