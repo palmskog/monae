@@ -23,8 +23,8 @@ Reserved Notation "x <| p |> y" (format "x  <| p |>  y", at level 50).
   - Module choiceMonadAltCI.
   - Module choiceMonadNondet.
   - Module choiceMonadAltProb.
-  - Module relMonadState.
-  - Module relMonadNondetState. TODO
+  - Module choiceMonadState.
+  - Module choiceMonadNondetState.
 
 *)
 
@@ -270,28 +270,27 @@ End Exports.
 End choiceMonadState.
 Export choiceMonadState.Exports.
 
-(* TODO Module relMonadNondetState.
-Record mixin_of (M : relnondetMonad) : Type := Mixin {
+Module choiceMonadNondetState.
+Record mixin_of (M : choicenondetMonad) : Type := Mixin {
   (* backtrackable state *)
-  _ : relBindLaws.right_zero (@Bind M) (@Fail _) ;
+  _ : choiceBindLaws.right_zero (@Bind M) (@Fail _) ;
   (* composition distributes rightwards over choice *)
-  _ : relBindLaws.bind_right_distributive (@Bind M) [~p]
+  _ : choiceBindLaws.bind_right_distributive (@Bind M) [~p]
 }.
-Record class_of S (m : finType -> Type) : Type := Class {
-  base : relMonadNondet.class_of m ;
-  base2 : relMonadState.mixin_of S (relMonadFail.baseType (relMonadNondet.baseType (relMonadNondet.Pack base))) ;
-  mixin : mixin_of (relMonadNondet.Pack base)
+Record class_of S (m : choiceType -> choiceType) : Type := Class {
+  base : choiceMonadNondet.class_of m ;
+  base2 : choiceMonadState.mixin_of S (choiceMonadFail.baseType (choiceMonadNondet.baseType (choiceMonadNondet.Pack base))) ;
+  mixin : mixin_of (choiceMonadNondet.Pack base)
 }.
-Structure t S : Type := Pack { m : finType -> Type ; class : class_of S m }.
-Definition baseType S (M : t S) := relMonadNondet.Pack (base (class M)).
+Structure t S : Type := Pack { m : choiceType -> choiceType ; class : class_of S m }.
+Definition baseType S (M : t S) := choiceMonadNondet.Pack (base (class M)).
 Module Exports.
-Notation relnondetStateMonad := t.
-Coercion baseType : relnondetStateMonad >-> relnondetMonad.
+Notation choicenondetStateMonad := t.
+Coercion baseType : choicenondetStateMonad >-> choicenondetMonad.
 Canonical baseType.
-Definition state_of_nondetstate S (M : relnondetStateMonad S) :=
-  relMonadState.Pack (relMonadState.Class (base2 (class M))).
+Definition state_of_nondetstate S (M : choicenondetStateMonad S) :=
+  choiceMonadState.Pack (choiceMonadState.Class (base2 (class M))).
 Canonical state_of_nondetstate.
 End Exports.
-End relMonadNondetState.
-Export relMonadNondetState.Exports.
-*)
+End choiceMonadNondetState.
+Export choiceMonadNondetState.Exports.
