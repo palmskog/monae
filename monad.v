@@ -184,9 +184,9 @@ congr Functor.Class; exact/ProofIrrelevance.proof_irrelevance.
 Qed.*)
 End functor_lemmas.
 
-Definition Squaring (A : choiceType) := (A * A)%type.
+Definition Squaring (A : Type) := (A * A)%type.
 Notation "A `2" := (Squaring A).
-Definition squaring_f (A B : choiceType) (f : A -> B) : A`2 -> B`2 := fun x => (f x.1, f x.2).
+Definition squaring_f (A B : Type) (f : A -> B) : A`2 -> B`2 := fun x => (f x.1, f x.2).
 Lemma squaring_f_id : FunctorLaws.id squaring_f.
 Proof. by move=> A /=; apply functional_extensionality => -[x1 x2]. Qed.
 Lemma squaring_f_comp : FunctorLaws.comp squaring_f.
@@ -246,7 +246,7 @@ Proof. by []. Qed.
 End functorcomposition_lemmas.
 
 Section curry_functor.
-Definition curry_M (X : choiceType) : choiceType -> choiceType := fun B => [choiceType of (X * B)%type].
+Definition curry_M (X : choiceType) : choiceType -> Type := fun B => [choiceType of (X * B)%type].
 Definition curry_f (X A B : choiceType) (f : A -> B) : curry_M X A -> curry_M X B :=
   fun x : X * A => (x.1, f x.2).
 Lemma curry_f_id X : FunctorLaws.id (@curry_f X).
@@ -276,14 +276,13 @@ Canonical fun_eqType (T1 T2 : eqType) :=
   Eval hnf in EqType (T1 -> T2) (@fun_eqMixin T1 T2).
 
 Axiom fun_choiceMixin : forall (T1 T2 : choiceType), choiceMixin (T1 -> T2).
-Admitted.
 Canonical fun_choiceType (T1 T2 : choiceType) :=
   Eval hnf in ChoiceType (T1 -> T2) (@fun_choiceMixin T1 T2).
 
 End fun_choiceType.
 
 Section uncurry_functor.
-Definition uncurry_M (X : choiceType) : choiceType -> choiceType := fun B => [choiceType of X -> B].
+Definition uncurry_M (X : choiceType) : choiceType -> Type := fun B => [choiceType of X -> B].
 Definition uncurry_f (X A B : choiceType) (f : A -> B) : uncurry_M X A -> uncurry_M X B :=
   fun g : X -> A => f \o g.
 Lemma uncurry_f_id X : FunctorLaws.id (@uncurry_f X).
@@ -302,7 +301,7 @@ End uncurry_functor.
 
 Section natural_transformation.
 Variables f g : functor.
-Definition transformation_type := forall A : choiceType, f A -> g A.
+Definition transformation_type := forall A, f A -> g A.
 Definition naturalP (phi : transformation_type) :=
   forall (A B : choiceType) (h : A -> B), (g # h) \o (phi A) = (phi B) \o (f # h).
 End natural_transformation.
@@ -529,7 +528,7 @@ Hypothesis joinretM : JoinLaws.join_left_unit ret join.
 Hypothesis joinMret : JoinLaws.join_right_unit ret join.
 Hypothesis joinA : JoinLaws.join_associativity join.
 
-Let bind (A B : choiceType) (m : F A) (f : A -> F B) : F B := join ((F # f) m).
+Let bind (A : choiceType) B (m : F A) (f : A -> F B) : F B := join ((F # f) m).
 
 Lemma bindretf_derived : BindLaws.left_neutral bind ret.
 Proof.
@@ -608,7 +607,7 @@ Proof. apply: bindmret_derived; exact: joinMret. Qed.
 Lemma bindA : BindLaws.associative (@Bind).
 Proof. apply bindA_derived; [exact: join_naturality | exact: joinA]. Qed.
 
-Lemma bindE' (A B : choiceType) : Bind = fun x (f : A -> M B) => Join ((M # f) x).
+Lemma bindE' (A : choiceType) B : Bind = fun x (f : A -> M B) => Join ((M # f) x).
 Proof. by []. Qed.
 Lemma joinretM' A C (f:C->_) : @Join M A \o (@Ret M (M A) \o f) = f.
 Proof. by rewrite compA joinretM. Qed.
@@ -814,31 +813,31 @@ Proof. case: ifPn => Hb //; by rewrite fmapE bindretf. Qed.
 
 (* monadic counterpart of function composition:
    composes a pure function after a monadic function *)
-Definition fcomp A B C (f : A -> B) (g : C -> M A) := locked ((M # f) \o g).
+Definition fcomp (A B : choiceType) C (f : A -> B) (g : C -> M A) := locked ((M # f) \o g).
 Arguments fcomp : simpl never.
 Local Notation "f (o) g" := (fcomp f g).
 
-Lemma fcomp_def A B C (f : A -> B) (g : C -> M A) : f (o) g = (M # f) \o g.
+Lemma fcomp_def (A B : choiceType) C (f : A -> B) (g : C -> M A) : f (o) g = (M # f) \o g.
 Proof. by rewrite /fcomp; unlock. Qed.
 
-Lemma fcompE A B C (f : A -> B) (g : C -> M A) c : (f (o) g) c = fmap f (g c).
+Lemma fcompE (A B : choiceType) C (f : A -> B) (g : C -> M A) c : (f (o) g) c = fmap f (g c).
 Proof. by rewrite /fcomp; unlock. Qed.
 
-Lemma fmap_comp A B C (f : A -> B) (g : C -> A) (m : M C) :
+Lemma fmap_comp (A B C : choiceType) (f : A -> B) (g : C -> A) (m : M C) :
   fmap (f \o g) m = fmap f (fmap g m).
 Proof. by rewrite 3!fmapE bindA; rewrite_ bindretf. Qed.
 
-Lemma fcomp_comp A B C D (f : A -> B) (g : C -> A) (m : D -> M C) :
+Lemma fcomp_comp (A B C : choiceType) D (f : A -> B) (g : C -> A) (m : D -> M C) :
   (f \o g) (o) m = f (o) (g (o) m).
 Proof. by rewrite 3!fcomp_def functor_o compA. Qed.
 
-Lemma fmap_bind A B C (f : A -> B) m (g : C -> M A) :
+Lemma fmap_bind (A B C : choiceType) (f : A -> B) m (g : C -> M A) :
   fmap f (m >>= g) = m >>= (f (o) g).
 Proof.
 rewrite fcomp_def fmapE bindA; bind_ext => c; by rewrite compE -/(fmap _ _) fmapE.
 Qed.
 
-Lemma skip_fmap A B (f : A -> B) (mb : M B) ma :
+Lemma skip_fmap (A B : choiceType) (f : A -> B) (mb : M B) ma :
   mb >> (fmap f ma) = fmap f (mb >> ma).
 Proof. by rewrite fmap_bind fcomp_def. Qed.
 
@@ -848,7 +847,7 @@ apply functional_extensionality.
 by elim=> // h t /= IH; rewrite !rev_cons IH map_rcons.
 Qed.*)
 
-Lemma mfoldl_rev (T R : Type) (f : R -> T -> R) (z : R) (s : seq T -> M (seq T)) :
+Lemma mfoldl_rev (T R : choiceType) (f : R -> T -> R) (z : R) (s : seq T -> M [choiceType of seq T]) :
   foldl f z (o) (rev (o) s) = foldr (fun x => f^~ x) z (o) s.
 Proof.
 apply functional_extensionality => x; rewrite !fcompE 3!fmapE !bindA.
@@ -862,26 +861,26 @@ Proof. by apply functional_extensionality => s; rewrite -foldl_rev. Qed.
 Lemma joinE A (pp : M (M A)) : Join pp = pp >>= id.
 Proof. rewrite bindE; congr Join; by rewrite functor_id. Qed.
 
-Lemma join_fmap A B (f : A -> M B) m : Join (fmap f m) = m >>= f.
+Lemma join_fmap (A B : choiceType) (f : A -> M B) m : Join (fmap f m) = m >>= f.
 Proof. by rewrite bindE. Qed.
 
-Definition kleisli A B C (m : B -> M C) (n : A -> M B) : A -> M C :=
+Definition kleisli A (B : choiceType) C (m : B -> M C) (n : A -> M B) : A -> M C :=
   Join \o (M # m) \o n.
 Local Notation "m >=> n" := (kleisli m n).
 
-Lemma fcomp_kleisli A B C D (f : A -> B) (g : C -> M A) (h : D -> M C) :
+Lemma fcomp_kleisli (A B C : choiceType) D (f : A -> B) (g : C -> M A) (h : D -> M C) :
   f (o) (g >=> h) = (f (o) g) >=> h.
 Proof.
 rewrite /kleisli 2!fcomp_def 2!(compA (M # f)).
 by rewrite join_naturality functor_o compA.
 Qed.
 
-Lemma kleisli_fcomp A B C (f : A -> M B) (g : B -> A) (h : C -> M B) :
+Lemma kleisli_fcomp (A B : choiceType) C (f : A -> M B) (g : B -> A) (h : C -> M B) :
   ((f \o g) >=> h) = f >=> (g (o) h).
 Proof. by rewrite /kleisli fcomp_def functor_o 2!compA. Qed.
 Local Notation "m >=> n" := (kleisli m n).
 
-Lemma bind_kleisli A B C m (f : B -> M C) (g : A -> M B) :
+Lemma bind_kleisli (A B : choiceType) C m (f : B -> M C) (g : A -> M B) :
   m >>= (f >=> g) = (m >>= g) >>= f.
 Proof. by rewrite bindA; bind_ext => a; rewrite /kleisli !compE join_fmap. Qed.
 
@@ -919,7 +918,7 @@ Qed.
 End strength.
 *)
 
-Definition mpair {M : monad} {A} (xy : (M A * M A)%type) : M (A * A)%type :=
+Definition mpair {M : monad} {A : choiceType} (xy : (M A * M A)%type) : M [choiceType of A * A] :=
   let (mx, my) := xy in
   mx >>= (fun x => my >>= fun y => Ret (x, y)).
 
@@ -927,7 +926,7 @@ Lemma mpairE (M : monad) A (mx my : M A) :
   mpair (mx, my) = mx >>= (fun x => my >>= fun y => Ret (x, y)).
 Proof. by []. Qed.
 
-Lemma naturality_mpair (M : monad) A B (f : A -> B) (g : A -> M A):
+Lemma naturality_mpair (M : monad) (A B : choiceType) (f : A -> B) (g : A -> M A):
   (M # f^`2) \o (mpair \o g^`2) = mpair \o ((M # f) \o g)^`2.
 Proof.
 apply functional_extensionality => -[a0 a1].
@@ -937,72 +936,11 @@ rewrite fcompE fmap_bind 2!compE -/(fmap _ _) bind_fmap; bind_ext => a3.
 by rewrite fcompE -(compE (fmap f^`2)) ret_naturality.
 Qed.
 
-Local Notation "[ \o f , .. , g , h ]" := (f \o .. (g \o h) ..)
-  (at level 0) (*, format "[ \o '['  f , '/' .. , '/' g , '/' h ']' ]"
-  ).*) : test_scope.
-
-Local Open Scope test_scope.
-
-Lemma naturality_mpair' (M : monad) A B (f : A -> B) (g : A -> M A):
-  (M # f^`2) \o (mpair \o g^`2) = mpair \o ((M # f) \o g)^`2.
-Proof.
-apply functional_extensionality => -[a0 a1].
-change ((M # f^`2 \o (mpair \o g^`2)) (a0, a1)) with
-    ((M # f^`2) (mpair (g a0, g a1))).
-change ((mpair \o (M # f \o g)^`2) (a0, a1)) with
-    (mpair ((M # f \o g) a0,(M # f \o g) a1)).
-rewrite !mpairE.
-rewrite !bindE.
-evar (T : Type);evar (RHS : A -> T).
-have ->: (fun x : A => do y <- g a1; Ret (x, y)) = RHS.
- - apply functional_extensionality => x; rewrite bindE.
-  rewrite functor_o.
-change (Join ([\o M # Ret,M # pair x] (g a1))) with
-      ([\o Join,M # Ret,M # pair x] (g a1)).
-  rewrite joinMret'.
-  exact: erefl.
-rewrite /RHS {RHS}; rewrite {T}.
-change ((M # f^`2) (Join ((M # (fun x : A => (M # pair x) (g a1))) (g a0)))) with
-    ((M # f^`2 \o Join) ((M # (fun x : A => (M # pair x) (g a1))) (g a0))).
-rewrite join_naturality.
-evar (T : Type);evar (RHS : T).
-have->:(M # (fun x : B => do y <- (M # f \o g) a1; Ret (x, y))) = RHS.
-- rewrite functor_o.
-  rewrite bindE'.
-  rewrite functor_o.
-  exact: erefl.
-rewrite/RHS{RHS};rewrite{T}.
-change
-  (
-    Join
-    (((M # Join \o M # (Fun M (B:=M (B * B)%type))^~ ((M # f \o g) a1)) \o
-        M # (fun x y : B => Ret (x, y))) ((M # f \o g) a0))
-  ) with
-    (
-      (
-        [ \o Join ,
-          (M # Join) ,
-          (M # (Fun M (B:=M (B * B)%type))^~ ((M # f \o g) a1)) ,
-          (M # (fun x y : B => Ret (x, y))) ,
-          (M # f \o g) ]
-      ) a0)
-    .
-rewrite joinA'.
-(*
-rewrite fmap_bind. compE [in RHS]/= bind_fmap; bind_ext => a2.
-rewrite fcompE fmap_bind compE bind_fmap; bind_ext => a3.
-by rewrite fcompE -(compE (fmap M # f^`2)) fmap_ret.
-Qed.
-*)
-Abort.
-
-Local Close Scope test_scope.
-
 Section rep.
 
 Variable M : monad.
 
-Fixpoint rep (n : nat) (mx : M unit) : M unit :=
+Fixpoint rep (n : nat) (mx : M unit_choiceType) : M unit_choiceType :=
   if n is n.+1 then mx >> rep n mx else skip.
 
 Lemma repS mx n : rep n.+1 mx = rep n mx >> mx.
@@ -1024,9 +962,9 @@ End rep.
 Section MonadCount.
 
 Variable M : monad.
-Variable tick : M unit.
+Variable tick : M unit_choiceType.
 
-Fixpoint hanoi n : M unit :=
+Fixpoint hanoi n : M unit_choiceType :=
   if n is n.+1 then hanoi n >> tick >> hanoi n else skip.
 
 Lemma hanoi_rep n : hanoi n = rep (2 ^ n).-1 tick.
@@ -1044,9 +982,9 @@ Record mixin_of (M : monad) : Type := Mixin {
   (* exceptions are left-zeros of sequential composition *)
   _ : BindLaws.left_zero (@Bind M) fail (* fail A >>= f = fail B *)
 }.
-Record class_of (m : Type -> Type) := Class {
+Record class_of (m : choiceType -> choiceType) := Class {
   base : Monad.class_of m ; mixin : mixin_of (Monad.Pack base) }.
-Structure t := Pack { m : Type -> Type ; class : class_of m }.
+Structure t := Pack { m : choiceType -> choiceType ; class : class_of m }.
 Definition baseType (M : t) := Monad.Pack (base (class M)).
 Module Exports.
 Definition Fail (M : t) : forall A, m M A :=
@@ -1065,23 +1003,23 @@ Lemma bindfailf : BindLaws.left_zero (@Bind M) (@Fail _).
 Proof. by case : M => m [? []]. Qed.
 End fail_lemmas.
 
-Lemma fmap_fail {A B} (M : failMonad) (f : A -> B) : fmap f Fail = Fail :> M _.
+Lemma fmap_fail {A B : choiceType} (M : failMonad) (f : A -> B) : fmap f Fail = Fail :> M _.
 Proof. by rewrite fmapE bindfailf. Qed.
 
 Section guard_assert.
 
 Variable M : failMonad.
 
-Definition guard (b : bool) : M unit := if b then skip else Fail.
+Definition guard (b : bool) : M unit_choiceType := if b then skip else Fail.
 
 (* guard distributes over conjunction *)
 Lemma guard_and a b : guard (a && b) = guard a >> guard b.
 Proof. move: a b => -[b|b]; by [rewrite bindskipf| rewrite bindfailf]. Qed.
 
-Definition assert {A} (p : pred A) (a : A) : M A :=
+Definition assert {A : choiceType} (p : pred A) (a : A) : M A :=
   guard (p a) >> Ret a.
 
-Definition bassert {A} (p : pred A) (m : M A) : M A := m >>= assert p.
+Definition bassert {A : choiceType} (p : pred A) (m : M A) : M A := m >>= assert p.
 
 (* follows from guards commuting with anything *)
 Lemma commutativity_of_assertions A q :
@@ -1110,12 +1048,12 @@ Arguments guard {M}.
 Lemma well_founded_size A : well_founded (fun x y : seq A => size x < size y).
 Proof. by apply: (@Wf_nat.well_founded_lt_compat _ size) => ? ? /ltP. Qed.
 
-Definition bassert_hylo {M : failMonad} A B
-  (f : B -> M (A * B)%type) (p : pred B) (r : forall p f, B -> B -> bool) :=
+Definition bassert_hylo {M : failMonad} (A B : choiceType)
+  (f : B -> M [choiceType of A * B]) (p : pred B) (r : forall p f, B -> B -> bool) :=
   forall b, f b = bassert (fun z => r p f z.2 b) (f b).
 
-Definition bassert_size {M : failMonad} A B
-  (f : seq B -> M (A * seq B)%type) :=
+Definition bassert_size {M : failMonad} (A B : choiceType)
+  (f : seq B -> M [choiceType of A * seq B]) :=
   @bassert_hylo M _ _ f predT (fun _ _ x y => size x < size y).
 
 (* section 4.3, mu2017 *)
@@ -1124,12 +1062,12 @@ Section unfoldM.
 Local Open Scope mu_scope.
 
 Section unfoldM_monad.
-Variables (M : monad) (A B : Type).
+Variables (M : monad) (A B : choiceType).
 Variable (r : B -> B -> bool).
 Hypothesis wfr : well_founded r.
-Variables (p : pred B) (f : B -> M (A * B)%type).
+Variables (p : pred B) (f : B -> M [choiceType of A * B]).
 
-Definition unfoldM' (y : B) (g : forall y' : B, r y' y -> M (seq A)) : M (seq A) :=
+Definition unfoldM' (y : B) (g : forall y' : B, r y' y -> M [choiceType of seq A]) : M [choiceType of seq A] :=
   if p y then Ret [::] else f y >>=
     (fun xz => match Bool.bool_dec (r xz.2 y) true with
             | left H => fmap (cons xz.1) (g xz.2 H)
@@ -1143,10 +1081,10 @@ Definition unfoldM := Fix wfr (fun _ => _ _) unfoldM'.
 End unfoldM_monad.
 
 Section unfoldM_failMonad.
-Variables (M : failMonad) (A B' : Type).
+Variables (M : failMonad) (A B' : choiceType).
 Let B := seq B'.
 Notation unfoldM := (@unfoldM M A _ _ (@well_founded_size B')).
-Variables (p : pred B) (f : B -> M (A * B)%type).
+Variables (p : pred B) (f : B -> M [choiceType of A * B]).
 
 Hypothesis decr_size : bassert_size f.
 
@@ -1171,9 +1109,9 @@ Arguments unfoldM : simpl never.
 
 (* section 4.4, mu2017 *)
 Section hyloM.
-Variables (M : failMonad) (A B C : Type).
-Variables (op : A -> M C -> M C) (e : C) (p : pred B) (f : B -> M (A * B)%type).
-Variable seed : forall (p : pred B) (f : B -> M (A * B)%type), B -> B -> bool.
+Variables (M : failMonad) (A B C : choiceType).
+Variables (op : A -> M C -> M C) (e : C) (p : pred B) (f : B -> M [choiceType of A * B]).
+Variable seed : forall (p : pred B) (f : B -> M [choiceType of A * B]), B -> B -> bool.
 
 Definition hyloM' (y : B) (g : forall y', seed p f y' y -> M C) : M C :=
   if p y then Ret e else f y >>=
@@ -1216,9 +1154,9 @@ Record mixin_of (M : monad) : Type := Mixin {
   (* in general, composition does not distribute rightwards over choice *)
   (* NB: no bindDr to accommodate both angelic and demonic interpretations of nondeterminism *)
 }.
-Record class_of (m : Type -> Type) : Type := Class {
+Record class_of (m : choiceType -> choiceType) : Type := Class {
   base : Monad.class_of m ; mixin : mixin_of (Monad.Pack base) }.
-Structure t := Pack { m : Type -> Type ; class : class_of m }.
+Structure t := Pack { m : choiceType -> choiceType ; class : class_of m }.
 Definition baseType (M : t) := Monad.Pack (base (class M)).
 Module Exports.
 Definition Alt M : forall A, m M A -> m M A -> m M A :=
@@ -1242,13 +1180,13 @@ Lemma altA : forall A, associative (@Alt M A).
 Proof. by case: M => m [? []]. Qed.
 
 (* TODO: name ok? *)
-Lemma naturality_nondeter A B (f : A -> B) p q :
+Lemma naturality_nondeter (A B : choiceType) (f : A -> B) p q :
   fmap f (p [~] q) = fmap f p [~] fmap f q :> M _.
 Proof. by rewrite 3!fmapE alt_bindDl. Qed.
 
 Local Open Scope mu_scope.
 
-Lemma alt_fmapDl A B (f : A -> B) (m1 m2 : M A) :
+Lemma alt_fmapDl (A B : choiceType) (f : A -> B) (m1 m2 : M A) :
   fmap f (m1 [~] m2) = fmap f m1 [~] fmap f m2.
 Proof. by rewrite 3!fmapE alt_bindDl. Qed.
 
@@ -1256,7 +1194,7 @@ End monadalt_lemmas.
 
 Section arbitrary.
 
-Variables (M : altMonad) (A : Type) (def : A).
+Variables (M : altMonad) (A : choiceType) (def : A).
 
 Definition arbitrary : seq A -> M A :=
   foldr1 (Ret def) (fun x y => x [~] y) \o map Ret.
@@ -1268,9 +1206,9 @@ Arguments arbitrary {M} {A}.
 Section subsequences_of_a_list.
 Local Open Scope mu_scope.
 
-Variables (M : altMonad) (A : Type).
+Variables (M : altMonad) (A : choiceType).
 
-Fixpoint subs (s : seq A) : M (seq A) :=
+Fixpoint subs (s : seq A) : M [choiceType of seq A] :=
   if s isn't h :: t then Ret [::] else
   let t' := subs t in
   fmap (cons h) t' [~] t'.
@@ -1291,8 +1229,8 @@ Lemma subs_cat (xs ys : seq A) :
 Proof.
 elim: xs ys => [ys |x xs IH ys].
   by rewrite cat0s /= bindretf bindmret.
-rewrite {1}[in RHS]/subs fmapE -/(subs _) alt_bindDl bindA.
-Open (X in subs xs >>= X).
+rewrite [subs (x :: xs)]/= fmapE alt_bindDl bindA.
+Open (X in _ = (subs xs >>= X) [~] _).
   rewrite bindretf.
   rewrite_ cat_cons.
   reflexivity.
@@ -1313,21 +1251,21 @@ Variable M : altMonad.
 
 Local Open Scope mu_scope.
 
-Fixpoint insert {A} (a : A) (s : seq A) : M (seq A) :=
+Fixpoint insert {A : choiceType} (a : A) (s : seq A) : M [choiceType of seq A] :=
   if s isn't h :: t then Ret [:: a] else
   Ret (a :: h :: t) [~] fmap (cons h) (insert a t).
 Arguments insert : simpl never.
 
-Lemma insertE A (a : A) s :
+Lemma insertE (A : choiceType) (a : A) s :
   insert a s = if s isn't h :: t then Ret [:: a] else
   Ret (a :: h :: t) [~] fmap (cons h) (insert a t).
 Proof. by case: s. Qed.
 
-Fixpoint perm {A} (s : seq A) : M (seq A) :=
+Fixpoint perm {A : choiceType} (s : seq A) : M [choiceType of seq A] :=
   if s isn't h :: t then Ret [::] else perm t >>= insert h.
 
 (* see also netys2017 *)
-Lemma insert_map A B (f : A -> B) (a : A) :
+Lemma insert_map (A B : choiceType) (f : A -> B) (a : A) :
   insert (f a) \o map f = map f (o) insert a :> (_ -> M _).
 Proof.
 apply functional_extensionality; elim => [|y xs IH].
@@ -1342,8 +1280,8 @@ by rewrite fmap_comp -(fcompE (map f)) -IH [RHS]/= insertE.
 Qed.
 
 (* see also netys2017 *)
-Lemma perm_map A B (f : A -> B) :
-  perm \o map f = map f (o) perm :> (seq A -> M (seq B)).
+Lemma perm_map (A B : choiceType) (f : A -> B) :
+  perm \o map f = map f (o) perm :> (seq A -> M [choiceType of seq B]).
 Proof.
 apply functional_extensionality; elim => [/=|x xs IH].
   by rewrite fcompE [perm _]/= /fmap -(compE (M # map f)) ret_naturality.
@@ -1360,7 +1298,7 @@ Hypothesis altmm : forall A, idempotent (@Alt _ A : M A -> M A -> M A).
 
 Local Open Scope mu_scope.
 
-Variables (A : Type) (p : pred A).
+Variables (A : choiceType) (p : pred A).
 
 Lemma filter_insertN a : ~~ p a ->
   forall s, (filter p (o) insert a) s = Ret (filter p s) :> M _.
@@ -1419,14 +1357,14 @@ Qed.
 End perm_filter.
 
 Module MonadAltCI.
-Record mixin_of (M : Type -> Type) (op : forall A, M A -> M A -> M A) : Type := Mixin {
+Record mixin_of (M : choiceType -> choiceType) (op : forall A, M A -> M A -> M A) : Type := Mixin {
   _ : forall A, idempotent (op A) ;
   _ : forall A, commutative (op A)
 }.
-Record class_of (m : Type -> Type) : Type := Class {
+Record class_of (m : choiceType -> choiceType) : Type := Class {
   base : MonadAlt.class_of m ;
   mixin : mixin_of (@Alt (MonadAlt.Pack base)) }.
-Structure t := Pack { m : Type -> Type ; class : class_of m }.
+Structure t := Pack { m : choiceType -> choiceType ; class : class_of m }.
 Definition baseType (M : t) := MonadAlt.Pack (base (class M)).
 Module Exports.
 Notation altCIMonad := t.
@@ -1452,7 +1390,7 @@ End altci_lemmas.
 
 (* mu2017, Sect. 3.2, see also netsys2017 *)
 Section altci_insert.
-Variables (M : altCIMonad) (A : Type) (a : A).
+Variables (M : altCIMonad) (A : choiceType) (a : A).
 
 Local Open Scope mu_scope.
 
@@ -1487,12 +1425,12 @@ Record mixin_of (M : failMonad) (a : forall A, M A -> M A -> M A) : Type :=
   Mixin { _ : BindLaws.left_id (@Fail M) a ;
           _ : BindLaws.right_id (@Fail M) a
 }.
-Record class_of (m : Type -> Type) : Type := Class {
+Record class_of (m : choiceType -> choiceType) : Type := Class {
   base : MonadFail.class_of m ;
   base2 : MonadAlt.mixin_of (Monad.Pack (MonadFail.base base)) ;
   mixin : @mixin_of (MonadFail.Pack base) (MonadAlt.alt base2)
 }.
-Structure t : Type := Pack { m : Type -> Type ; class : class_of m }.
+Structure t : Type := Pack { m : choiceType -> choiceType ; class : class_of m }.
 Definition baseType (M : t) := MonadFail.Pack (base (class M)).
 Module Exports.
 Notation nondetMonad := t.
@@ -1522,7 +1460,7 @@ by rewrite bindfailf.
 Abort.
 
 Section nondet_big.
-Variables (M : nondetMonad) (A : Type).
+Variables (M : nondetMonad) (A : choiceType).
 Canonical alt_monoid :=
   Monoid.Law (@altA (alt_of_nondet M) A) (@altfailm _ _) (@altmfail _ _).
 
@@ -1537,16 +1475,16 @@ End nondet_big.
 (* gibbons2011icfp, Sect. 4.4 *)
 
 Section select.
-Variables (M : nondetMonad) (A : Type).
+Variables (M : nondetMonad) (A : choiceType).
 Implicit Types s : seq A.
 
-Fixpoint select s : M (A * seq A)%type :=
+Fixpoint select s : M [choiceType of A * seq A] :=
   if s isn't h :: t then Fail else
   (Ret (h, t) [~] do x <- select t; Ret (x.1, h :: x.2)).
 
 Local Obligation Tactic := idtac.
 (* variant of select that keeps track of the length, useful to write perms *)
-Program Fixpoint tselect s : M (A * (size s).-1.-tuple A)%type :=
+Program Fixpoint tselect s : M [choiceType of A * (size s).-1.-tuple A] :=
   if s isn't h :: t then Fail else
   (Ret (h, @Tuple (size t) A t _) [~]
   do x <- tselect t; Ret (x.1, @Tuple (size t) A _ _ (* h :: x.2 *))).
@@ -1586,7 +1524,7 @@ Qed.
 Local Open Scope mu_scope.
 
 Lemma selectE s : select s =
-  fmap (fun xy => (xy.1, tval xy.2)) (tselect s) :> M (A * seq A)%type.
+  fmap (fun xy => (xy.1, tval xy.2)) (tselect s) :> M [choiceType of A * seq A].
 Proof.
 elim: s => [|h [|h' t] IH].
 - by rewrite fmapE bindfailf.
@@ -1609,12 +1547,12 @@ Arguments select {M} {A}.
 Arguments tselect {M} {A}.
 
 Section permutations.
-Variables (M : nondetMonad) (A : Type).
+Variables (M : nondetMonad) (A : choiceType).
 Implicit Types s : seq A.
 
 Local Obligation Tactic := idtac.
 Program Definition perms' s
-  (f : forall s', size s' < size s -> M (seq A)) : M (seq A) :=
+  (f : forall s', size s' < size s -> M [choiceType of seq A]) : M [choiceType of seq A] :=
   if s isn't h :: t then Ret [::] else
     do x <- tselect (h :: t); do y <- f x.2 _; Ret (x.1 :: y).
 Next Obligation.
@@ -1622,7 +1560,7 @@ move=> s H h t hts [y ys]; by rewrite size_tuple -hts ltnS leqnn.
 Qed.
 Next Obligation. by []. Qed.
 
-Definition perms : seq A -> M (seq A) :=
+Definition perms : seq A -> M [choiceType of seq A] :=
   Fix (@well_founded_size _) (fun _ => M _) perms'.
 
 Lemma tpermsE s : perms s = if s isn't h :: t then Ret [::] else
@@ -1644,9 +1582,9 @@ Arguments perms {M} {A}.
 
 (* from section 4.3 of mu2017, definition of perms using unfoldM *)
 Section mu_perm.
-Variables (A : Type) (M : nondetMonad).
+Variables (A : choiceType) (M : nondetMonad).
 
-Definition mu_perm : seq A -> M (seq A) :=
+Definition mu_perm : seq A -> M [choiceType of seq A] :=
   unfoldM (@well_founded_size _) (@nilp _) select.
 
 Lemma mu_permE s : mu_perm s = if s isn't h :: t then Ret [::]
@@ -1671,13 +1609,13 @@ Arguments mu_perm {A} {M}.
 
 Module SyntaxNondet.
 
-Inductive t : Type -> Type :=
-| ret : forall A, A -> t A
+Inductive t : choiceType -> Type :=
+| ret : forall A : choiceType, A -> t A
 | bind : forall B A, t B -> (B -> t A) -> t A
 | fail : forall A, t A
 | alt : forall A, t A -> t A -> t A.
 
-Fixpoint denote {M : nondetMonad} {A} (m : t A) : M A :=
+Fixpoint denote {M : nondetMonad} {A : choiceType} (m : t A) : M A :=
   match m with
   | ret A a => Ret a
   | bind A B m f => denote m >>= (fun x => denote (f x))
@@ -1707,10 +1645,10 @@ Record mixin_of (M : failMonad) : Type := Mixin {
   _ : forall A x, left_zero (Ret x) (@catch A)
   (* NB: left-zero of sequential composition inherited from failMonad *)
 }.
-Record class_of (m : Type -> Type) := Class {
+Record class_of (m : choiceType -> choiceType) := Class {
   base : MonadFail.class_of m ;
   mixin : mixin_of (MonadFail.Pack base) }.
-Record t : Type := Pack { m : Type -> Type ; class : class_of m }.
+Record t : Type := Pack { m : choiceType -> choiceType ; class : class_of m }.
 Definition baseType M := MonadFail.Pack (base (class M)).
 Definition monadType M := Monad.Pack (MonadFail.base (base (class M))).
 Module Exports.
@@ -1752,7 +1690,7 @@ Section work.
 
 Variable M : failMonad.
 
-Definition work s : M nat :=
+Definition work s : M nat_choiceType :=
   if O \in s then Fail else Ret (product s).
 
 (* work refined to eliminate multiple traversals *)
