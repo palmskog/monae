@@ -48,9 +48,9 @@ Record mixin_of (M : monad) : Type := Mixin {
   (* composition distributes leftwards over [probabilistic] choice *)
   _ : forall p, BindLaws.bind_left_distributive (@Bind M) (choice p)
 }.
-Record class_of (m : Type -> Type) := Class {
+Record class_of (m : choiceType -> choiceType) := Class {
   base : Monad.class_of m ; mixin : mixin_of (Monad.Pack base) }.
-Structure t := Pack { m : Type -> Type ; class : class_of m }.
+Structure t := Pack { m : choiceType -> choiceType ; class : class_of m }.
 Definition baseType (M : t) := Monad.Pack (MonadProb.base (class M)).
 Module Exports.
 Definition Choice (M : t) : forall p A, m M A -> m M A -> m M A :=
@@ -87,14 +87,14 @@ End prob_lemmas.
 Arguments choiceA {M} {A} _ _ _ _ {mx} {my} {mz}.
 Arguments choiceC {M} {A} _ {mx} {my}.
 
-Fixpoint uniform {M : probMonad} {A} (def(*NB: Coq functions are total*) : A) (s : seq A) : M A :=
+Fixpoint uniform {M : probMonad} {A : choiceType} (def(*NB: Coq functions are total*) : A) (s : seq A) : M A :=
   match s with
     | [::] => Ret def
     | [:: x] => Ret x
     | x :: xs => Ret x <| `Pr / IZR (Z_of_nat (size (x :: xs))) |> uniform def xs
   end.
 
-Lemma uniform_nil (M : probMonad) A (def : A) :
+Lemma uniform_nil (M : probMonad) (A : choiceType) (def : A) :
   uniform def [::] = Ret def :> M A.
 Proof. by []. Qed.
 
@@ -107,7 +107,7 @@ Lemma choice_ext (q p : prob) (M : probMonad) A (m1 m2 : M A) :
   p = q :> R -> m1 <| p |> m2 = m1 <| q |> m2.
 Proof. by move/prob_ext => ->. Qed.
 
-Lemma uniform_cons (M : probMonad) A (def : A) h s :
+Lemma uniform_cons (M : probMonad) (A : choiceType) (def : A) h s :
   uniform def (h :: s) = Ret h <| `Pr / IZR (Z_of_nat (size (h :: s))) |> uniform def s :> M A.
 Proof.
 case: s => //.
@@ -115,21 +115,21 @@ rewrite (@choice_ext (`Pr 1)) // ?choice1 //.
 by rewrite /= Rinv_1.
 Qed.
 
-Lemma uniform_singl (M : probMonad) A (def : A) h : size h = 1%nat ->
+Lemma uniform_singl (M : probMonad) (A : choiceType) (def : A) h : size h = 1%nat ->
   uniform def h = Ret (head def h) :> M A.
 Proof.
 case: h => // h [|//] _.
 by rewrite uniform_cons uniform_nil (@choice_ext (`Pr 1)) ?choice1 //= invR1.
 Qed.
 
-Lemma uniform_nseq (M : probMonad) A (def : A) h n :
+Lemma uniform_nseq (M : probMonad) (A : choiceType) (def : A) h n :
   uniform def (nseq n.+1 h) = Ret h :> M A.
 Proof.
 elim: n => // n IH.
 by rewrite (_ : nseq _ _ = h :: nseq n.+1 h) // uniform_cons IH choicemm.
 Qed.
 
-Lemma uniform_cat (M : probMonad) A (a : A) s t :
+Lemma uniform_cat (M : probMonad) (A : choiceType) (a : A) s t :
   let m := size s in let n := size t in
   uniform a (s ++ t) = uniform a s <| `Pr (divRnnm m n) |> uniform a t :> M _.
 Proof.
@@ -174,7 +174,7 @@ rewrite -minus_INR; last by apply/leP; rewrite leq_addr.
 by rewrite addnC minusE -subnBA // subnn subn0.
 Qed.
 
-Lemma uniform2 (M : probMonad) A (def : A) a b :
+Lemma uniform2 (M : probMonad) (A : choiceType) (def : A) a b :
   uniform def [:: a; b] = uniform def [:: b; a] :> M _.
 Proof.
 rewrite uniform_cons uniform_singl // uniform_cons uniform_singl //.
@@ -189,10 +189,10 @@ Record mixin_of (M : probMonad) : Type := Mixin {
   (* WARNING: this should not be asserted as an axiom in conjunction with distributivity of <||> over [] *)
   prob_bindDr : forall p, BindLaws.bind_right_distributive (@Bind M) (Choice p) (* NB: not used *)
 } .
-Record class_of (m : Type -> Type) := Class {
+Record class_of (m : choiceType -> choiceType) := Class {
   base : MonadProb.class_of m ;
   mixin : mixin_of (MonadProb.Pack base) }.
-Structure t := Pack { m : Type -> Type; class : class_of m }.
+Structure t := Pack { m : choiceType -> choiceType; class : class_of m }.
 Definition baseType (M : t) := MonadProb.Pack (base (class M)).
 Module Exports.
 Notation probDrMonad := t.
@@ -202,14 +202,14 @@ End Exports.
 End MonadProbDr.
 Export MonadProbDr.Exports.
 
-Lemma uniform_inde (M : probMonad) A a (x : seq A) {B} (m : M B) :
+Lemma uniform_inde (M : probMonad) (A : choiceType) a (x : seq A) {B} (m : M B) :
   do x <- uniform a x; m = m.
 Proof.
 elim: x m => [/= m|x xs IH m]; first by rewrite bindretf.
 by rewrite uniform_cons prob_bindDl IH bindretf choicemm.
 Qed.
 
-Lemma uniform_naturality (M : probMonad) A B (a : A) (b : B) (f : A -> B) :
+Lemma uniform_naturality (M : probMonad) (A B : choiceType) (a : A) (b : B) (f : A -> B) :
   forall x, (0 < size x)%nat ->
   ((@uniform M _ b) \o map f) x = (M # f \o uniform a) x.
 Proof.
@@ -225,7 +225,7 @@ by congr Choice.
 Qed.
 Arguments uniform_naturality {M A B}.
 
-Lemma mpair_uniform_base_case (M : probMonad) A a x (y : seq A) :
+Lemma mpair_uniform_base_case (M : probMonad) (A : choiceType) a x (y : seq A) :
   (0 < size y)%nat ->
   uniform (a, a) (cp [:: x] y) = mpair (uniform a [:: x], uniform a y) :> M _.
 Proof.
@@ -240,14 +240,14 @@ Qed.
 (* uniform choices are independent, in the sense that choosing consecutively
 from two uniform distributions is equivalent to choosing simultaneously from
 their cartesian product *)
-Lemma mpair_uniform (M : probMonad) A a (x y : seq A) :
+Lemma mpair_uniform (M : probMonad) (A : choiceType) a (x y : seq A) :
   (0 < size x)%nat -> (0 < size y)%nat ->
-  mpair (uniform a x, uniform a y) = uniform (a, a) (cp x y) :> M (A * A)%type.
+  mpair (uniform a x, uniform a y) = uniform (a, a) (cp x y) :> M _.
 Proof.
 elim: x y => // x; case=> [_ y _ size_y|x' xs IH y _ size_y]; apply/esym.
   exact/mpair_uniform_base_case.
 set xxs := x' :: xs.
-rewrite /cp -cat1s allpairs_cat -/(cp _ _) cp1 uniform_cat.
+rewrite /cp -cat1s allpairs_cat -/(cp _ _) cp1 [in LHS]uniform_cat.
 pose n := size y.
 pose l := size (cp xxs y).
 rewrite (_ : size _ = n); last by rewrite size_map.
@@ -278,12 +278,12 @@ Record mixin_of (M : altCIMonad) (a : prob -> forall A, M A -> M A -> M A) := Mi
   _ : forall A (p : prob),
     right_distributive (fun x y : M A => a p _ x y) (fun x y => Alt x y)
 }.
-Record class_of (m : Type -> Type) := Class {
+Record class_of (m : choiceType -> choiceType) := Class {
   base : MonadAltCI.class_of m ;
   base2 : MonadProb.mixin_of (Monad.Pack (MonadAlt.base (MonadAltCI.base base))) ;
   mixin : @mixin_of (MonadAltCI.Pack base) (@MonadProb.choice _ base2)
 }.
-Structure t : Type := Pack { m : Type -> Type ; class : class_of m }.
+Structure t : Type := Pack { m : choiceType -> choiceType ; class : class_of m }.
 Definition baseType (M : t) : altCIMonad := MonadAltCI.Pack (base (class M)).
 Definition altType (M : t) : altMonad := MonadAlt.Pack (MonadAltCI.base (base (class M))).
 Module Exports.
@@ -309,7 +309,7 @@ End altprob_lemmas.
 
 Section convexity_property.
 
-Variables (M : altProbMonad) (A : Type) (p q : M A).
+Variables (M : altProbMonad) (A : choiceType) (p q : M A).
 
 Lemma convexity w : p [~] q =
   (p <| w |> p) [~] (q <| w |> p) [~] (p <| w |> q) [~] (q <| w |> q).
@@ -324,28 +324,28 @@ Qed.
 End convexity_property.
 
 (* biased coin *)
-Definition bcoin {M : probMonad} (p : prob) : M bool :=
+Definition bcoin {M : probMonad} (p : prob) : M bool_choiceType :=
   Ret true <| p |> Ret false.
 Arguments bcoin : simpl never.
 
 (* arbitrary nondeterministic choice between booleans *)
-Definition arb {M : altMonad} : M bool := Ret true [~] Ret false.
+Definition arb {M : altMonad} : M bool_choiceType := Ret true [~] Ret false.
 
 Section mixing_choices.
 
 Variable M : altProbMonad.
 
-Definition arbcoin p : M bool :=
+Definition arbcoin p : M bool_choiceType :=
   do a <- arb ; (do c <- bcoin p; Ret (a == c) : M _).
-Definition coinarb p : M bool :=
+Definition coinarb p : M bool_choiceType :=
   do c <- bcoin p ; (do a <- arb; Ret (a == c) : M _).
 
 Lemma Ret_eqb_addL b :
-  (fun c => Ret (b == c)) = (fun c => Ret (~~ b (+) c)) :> (bool -> M bool).
+  (fun c => Ret (b == c)) = (fun c => Ret (~~ b (+) c)) :> (bool -> M bool_choiceType).
 Proof. case: b; apply functional_extensionality; by case. Qed.
 
 Lemma Ret_eqb_addR b :
-  (fun c => Ret (c == b)) = (fun c => Ret (~~ b (+) c)) :> (bool -> M bool).
+  (fun c => Ret (c == b)) = (fun c => Ret (~~ b (+) c)) :> (bool -> M bool_choiceType).
 Proof. case: b; apply functional_extensionality; by case. Qed.
 
 Definition Ret_eqb_add := (Ret_eqb_addL, Ret_eqb_addR).
@@ -387,16 +387,16 @@ Qed.
 End mixing_choices.
 
 Module MonadExceptProb.
-Record mixin_of (M : exceptMonad) (a : prob -> forall A : Type, M A -> M A -> M A) := Mixin {
+Record mixin_of (M : exceptMonad) (a : prob -> forall A : choiceType, M A -> M A -> M A) := Mixin {
   catchDl : forall A w, left_distributive (@Catch M A) (fun x y => a w A x y)
     (* NB: not used? *)
 }.
-Record class_of (m : Type -> Type) := Class {
+Record class_of (m : choiceType -> choiceType) := Class {
   base : MonadExcept.class_of m ;
   base2 : MonadProb.mixin_of (Monad.Pack (MonadFail.base (MonadExcept.base base))) ;
   mixin : @mixin_of (MonadExcept.Pack base) (@Choice (MonadProb.Pack (MonadProb.Class base2)))
 }.
-Structure t : Type := Pack { m : Type -> Type ; class : class_of m }.
+Structure t : Type := Pack { m : choiceType -> choiceType ; class : class_of m }.
 Definition baseType (M : t) : exceptMonad := MonadExcept.Pack (base (class M)).
 Module Exports.
 Notation exceptProbMonad := t.
@@ -409,13 +409,13 @@ End Exports.
 End MonadExceptProb.
 Export MonadExceptProb.Exports.
 
-Definition coins23 {M : exceptProbMonad} : M bool :=
+Definition coins23 {M : exceptProbMonad} : M bool_choiceType :=
   Ret true <| `Pr / 2 |> (Ret false <| `Pr / 2 |> (Fail : M _)).
 
 Lemma H23 : (0 <= 2/3 <= 1)%R. Proof. split; lra. Qed.
 
 (* NB: notation for ltac:(split; fourier?)*)
-Lemma choiceA_compute {N : probMonad} (T F : bool) (f : bool -> N bool) :
+Lemma choiceA_compute {N : probMonad} (T F : bool) (f : bool -> N bool_choiceType) :
   f T <|`Pr / 9|> (f F <|`Pr / 8|> (f F <|`Pr / 7|> (f F <|`Pr / 6|>
  (f T <|`Pr / 5|> (f F <|`Pr / 4|> (f F <|`Pr / 3|> (f F <|`Pr / 2|>
   f T))))))) = f F <|`Pr / 3|> (f F <|`Pr / 2|> f T) :> N _.
@@ -455,7 +455,7 @@ rewrite choicemm choiceC.
 rewrite (@choice_ext (Prob.mk H23)) //= /onem; by field.
 Qed.
 
-Definition uFFT {M : probMonad} : M bool :=
+Definition uFFT {M : probMonad} : M bool_choiceType :=
   uniform true [:: false; false; true].
 
 Lemma uFFTE (M : probMonad) : uFFT = bcoin (`Pr /3) :> M _.
@@ -473,7 +473,7 @@ rewrite (_ : (`Pr / 3)%R = probcplt (Prob.mk H23)) //.
 apply prob_ext => /=; rewrite /onem; field.
 Qed.
 
-Definition uTTF {M : probMonad} : M bool :=
+Definition uTTF {M : probMonad} : M bool_choiceType :=
   uniform true [:: true; true; false].
 
 Lemma uTTFE (M : probMonad) : uTTF = bcoin (@Prob.mk (2/3) H23) :> M _.
@@ -488,7 +488,7 @@ rewrite (choiceA _ _ (`Pr /2) (Prob.mk H23)); last first.
 by rewrite choicemm choiceC.
 Qed.
 
-Lemma uniform_notin (M : probMonad) (A : eqType) (def : A) (s : seq A) B
+Lemma uniform_notin (M : probMonad) (A : choiceType) (def : A) (s : seq A) B
   (ma mb : A -> M B) (p : pred A) :
   s != [::] ->
   (forall x, x \in s -> ~~ p x) ->
