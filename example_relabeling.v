@@ -14,9 +14,34 @@ Unset Printing Implicit Defensive.
 (* see Sect. 9 of gibbons2011icfp *)
 
 Section Tree.
-Variable A : Type.
+Variable A : choiceType.
 
 Inductive Tree := Tip (a : A) | Bin of Tree & Tree.
+
+Fixpoint encode_Tree (t : Tree) : GenTree.tree A :=
+  match t with
+  | Tip a => GenTree.Leaf a
+  | Bin t1 t2 => GenTree.Node 0 [:: encode_Tree t1; encode_Tree t2]
+  end.
+
+Fixpoint decode_tree (t : GenTree.tree A) : option Tree :=
+  match t with
+  | GenTree.Leaf a => Some (Tip a)
+  | GenTree.Node _ [:: a; b] =>
+    match decode_tree a, decode_tree b with
+    | Some a', Some b' => Some (Bin a' b')
+    | _, _ => None
+    end
+  | GenTree.Node _ _ => None
+  end.
+
+Lemma pcancel_Tree : pcancel encode_Tree decode_tree.
+Proof. by elim => //= ? -> ? ->. Qed.
+
+Definition Tree_eqMixin := PcanEqMixin pcancel_Tree.
+Canonical Tree_eqType := Eval hnf in EqType _ Tree_eqMixin.
+Definition Tree_choiceMixin := PcanChoiceMixin pcancel_Tree.
+Canonical Tree_choiceType := Eval hnf in ChoiceType _ Tree_choiceMixin.
 
 Fixpoint foldt B (f : A -> B) (g : B * B -> B) (t : Tree) : B :=
   match t with
@@ -53,12 +78,12 @@ Arguments Bin {A}.
 
 Section tree_relabelling.
 
-Variable Symbol : eqType. (* TODO: ideally, we would like a generic type here with a succ function *)
+Variable Symbol : choiceType. (* TODO: ideally, we would like a generic type here with a succ function *)
 Variable M : failFreshMonad Symbol.
 Variable q : pred (seq Symbol * seq Symbol).
 Hypothesis promotable_q : promotable (Distinct M) q.
 
-Definition relabel : Tree Symbol -> M (Tree Symbol) :=
+Definition relabel : Tree Symbol -> M [choiceType of Tree Symbol] :=
   foldt ((M # Tip) \o const Fresh) ((M # uncurry Bin) \o mpair).
 
 Let drTip {A} : A -> M _ :=
@@ -67,10 +92,10 @@ Let drBin {N : failMonad} : (N _ * N _ -> N _) :=
   (N # ucat) \o bassert q \o mpair.
 
 (* extracting the distinct symbol list *)
-Definition dlabels {N : failMonad} : Tree Symbol -> N (seq Symbol) :=
+Definition dlabels {N : failMonad} : Tree Symbol -> N [choiceType of seq Symbol] :=
   foldt (Ret \o wrap) drBin.
 
-Lemma dlabelsC t u (m : _ -> _ -> M (seq Symbol * seq Symbol)%type) :
+Lemma dlabelsC t u (m : _ -> _ -> M [choiceType of seq Symbol * seq Symbol]) :
   do x <- dlabels t; do x0 <- relabel u; m x0 x =
   do x0 <- relabel u; do x <- dlabels t; m x0 x.
 Proof.
