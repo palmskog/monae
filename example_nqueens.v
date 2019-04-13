@@ -7,9 +7,39 @@ From mathcomp Require Import eqtype ssrnat seq choice fintype tuple.
 From infotheo Require Import ssrZ.
 Require Import monad state_monad.
 
+Module embedding_to_choiceType.
+Section def.
+Variables (T : eqType) (C : choiceType) (f : T -> C) (g : C -> T) (gf : forall t, g (f t) = t).
+Let find_C := @Choice.InternalTheory.find C.
+Definition find_T (p : pred T) (n : nat) :=
+  match (find_C (p \o g) n) with
+  | None => None
+  | Some c => Some (g c)
+  end.
+Program Definition mixin : choiceMixin T := (@Choice.Mixin _ find_T _ _ _).
+Next Obligation.
+case: H; rewrite /find_T /=.
+case H': (find_C (P \o g) n) => //. 
+move/Choice.InternalTheory.correct: H' => H'.
+by move/Some_inj <-.
+Qed.
+Next Obligation.
+have H1: (P \o g) (f H) by rewrite /= (gf H); exact: H0.
+case/Choice.InternalTheory.complete: (ex_intro (P \o g) _ H1) => n Hn.
+exists n; rewrite /find_T.
+case H2: (find_C (P \o g) n); first by reflexivity.
+by move: H2 Hn; rewrite /find_C => ->.
+Qed.
+Next Obligation.
+rewrite /find_T => n /=.
+have -> //: P \o g = Q \o g.
+by move: H => /functional_extensionality ->.
+Qed.
+End def.
+End embedding_to_choiceType.
+
 (* TODO : decide if Z_choiceType should go into infothe.ssrZ *)
 Module Z_choiceType.
-(*Inductive Z : Set :=  Z0 : Z | Zpos : positive -> Z | Zneg : positive -> Z*)
 Definition zn (z : Z) : nat :=
   match z with
   | Z0 => 0
@@ -41,36 +71,13 @@ case: z => //= p; rewrite /nz.
 rewrite addn1 /= mul2n odd_double /= uphalf_double subnK; last by move/leP: (Pos2Nat.is_pos p).
 by rewrite Pos2Nat.id.
 Qed.
-Let find_nat := @Choice.InternalTheory.find nat_choiceType.
-Definition find_Z (p : pred Z) (n : nat) :=
-  match (find_nat (p \o nz) n) with
-  | None => None
-  | Some n => Some (nz n)
-  end.
-Program Definition Z_choiceMixin : choiceMixin Z := (@Choice.Mixin _ find_Z _ _ _).
-Next Obligation.
-case: H; rewrite /find_Z /=.
-case H': (find_nat (P \o nz) n) => //. 
-move/Choice.InternalTheory.correct: H' => H'.
-by move/Some_inj <-.
-Qed.
-Next Obligation.
-have H1: (P \o nz) (zn H) by rewrite /= nzzn; exact: H0.
-case/Choice.InternalTheory.complete: (ex_intro (P \o nz) _ H1) => n Hn.
-exists n; rewrite /find_Z.
-case H2: (find_nat (P \o nz) n); first by reflexivity.
-by move: H2 Hn; rewrite /find_nat => ->.
-Qed.
-Next Obligation.
-rewrite /find_Z => n /=.
-have -> //: P \o nz = Q \o nz. 
-by move: H => /functional_extensionality ->.
-Qed.
+Definition Z_choiceMixin := embedding_to_choiceType.mixin Z_eqType nat_choiceType zn nz nzzn.
 Module Exports.
 Definition Z_choiceType := Choice.Pack (Choice.Class Z_eqMixin Z_choiceMixin).
 End Exports.
 End Z_choiceType.
 Export Z_choiceType.Exports.
+Canonical Z_choiceType.
 
 (* from gibbons2011icfp and mu2017 *)
 
@@ -82,7 +89,7 @@ Section nqueens.
 
 (* input: queen position, already threatened up/down diagonals
    output: safe or not, update up/down diagonals *)
-Definition test : Z`2 -> (seq Z)`2 -> bool * (seq Z)`2 :=
+Definition test : Z`2 -> (seq Z)`2 -> bool_choiceType * [choiceType of (seq Z)`2] :=
   fun '(c, r) '(upds, downs) =>
     let (u, d) := (r - c, r + c)%Z in
     ((u \notin upds) && (d \notin downs), (u :: upds, d :: downs)).
@@ -103,7 +110,7 @@ Definition step1 : Z`2 -> (bool * (seq Z)`2) -> bool * (seq Z)`2 :=
 Definition safe1 : (seq Z)`2 -> seq Z`2 -> bool * (seq Z)`2 :=
   foldr step1 \o start1.
 
-Definition queens {M : nondetMonad} n : M (seq Z) :=
+Definition queens {M : nondetMonad} n : M [choiceType of seq Z] :=
   do rs <- perms (map Z_of_nat (iota 0 n)) ;
      (guard (safe1 empty (place n rs)).1 >> Ret rs).
 
@@ -112,15 +119,16 @@ End purely_functional.
 Section statefully.
 (* statefully constructing the sets of up/down diagonals threatened by the queens so far *)
 
-Variable M : stateMonad (seq Z)`2.
+Variable M : stateMonad [choiceType of seq Z`2].
 
-Definition start2 : M bool := Ret true.
+Definition start2 : M bool_choiceType := Ret true.
 
-Definition step2 (cr : Z`2) (k : M bool) : M bool :=
+Set Printing all.
+Definition step2 (cr : Z`2) (k : M bool_choiceType) : M bool_choiceType :=
   do b' <- k ;
-  do uds <- Get;
+  (do uds <- Get;
   let (b, uds') := test cr uds in
-  Put uds' >> Ret (b && b').
+  (Put uds' >> Ret (b && b'): M bool_choiceType): M bool_choiceType).
 
 Definition safe2 : seq Z`2 -> M bool :=
   foldr step2 start2.
