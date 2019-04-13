@@ -7,37 +7,6 @@ From mathcomp Require Import eqtype ssrnat seq choice fintype tuple.
 From infotheo Require Import ssrZ.
 Require Import monad state_monad.
 
-Module embedding_to_choiceType.
-Section def.
-Variables (T : eqType) (C : choiceType) (f : T -> C) (g : C -> T) (gf : forall t, g (f t) = t).
-Let find_C := @Choice.InternalTheory.find C.
-Definition find_T (p : pred T) (n : nat) :=
-  match (find_C (p \o g) n) with
-  | None => None
-  | Some c => Some (g c)
-  end.
-Program Definition mixin : choiceMixin T := (@Choice.Mixin _ find_T _ _ _).
-Next Obligation.
-case: H; rewrite /find_T /=.
-case H': (find_C (P \o g) n) => //. 
-move/Choice.InternalTheory.correct: H' => H'.
-by move/Some_inj <-.
-Qed.
-Next Obligation.
-have H1: (P \o g) (f H) by rewrite /= (gf H); exact: H0.
-case/Choice.InternalTheory.complete: (ex_intro (P \o g) _ H1) => n Hn.
-exists n; rewrite /find_T.
-case H2: (find_C (P \o g) n); first by reflexivity.
-by move: H2 Hn; rewrite /find_C => ->.
-Qed.
-Next Obligation.
-rewrite /find_T => n /=.
-have -> //: P \o g = Q \o g.
-by move: H => /functional_extensionality ->.
-Qed.
-End def.
-End embedding_to_choiceType.
-
 (* TODO : decide if Z_choiceType should go into infothe.ssrZ *)
 Module Z_choiceType.
 Definition zn (z : Z) : nat :=
@@ -52,15 +21,6 @@ Definition nz (n : nat) : Z :=
   else if odd n
        then Zneg (Pos.of_nat ((n./2) + 1))
        else Zpos (Pos.of_nat (n./2)).
-Lemma znnz n : zn (nz n) = n.
-Proof.
-case: n => //= n.
-case H: (odd n) => //=.
-- rewrite Nat2Pos.id uphalf_half; last by rewrite H add1n.
-  by rewrite mulnC mulnDl 2!muln2 -addnn -addnA odd_double_half H add1n.
-rewrite Nat2Pos.id uphalf_half; last by rewrite addn1.
-by rewrite addnK addnC mulnDr 2!mul2n -addnn -addnA odd_double_half H add0n add1n.
-Qed.
 Lemma nzzn z : nz (zn z) = z.
 Proof.
 case: z => //= p; rewrite /nz.
@@ -71,7 +31,12 @@ case: z => //= p; rewrite /nz.
 rewrite addn1 /= mul2n odd_double /= uphalf_double subnK; last by move/leP: (Pos2Nat.is_pos p).
 by rewrite Pos2Nat.id.
 Qed.
-Definition Z_choiceMixin := embedding_to_choiceType.mixin Z_eqType nat_choiceType zn nz nzzn.
+
+Lemma nzzn' : cancel zn nz.
+exact: nzzn.
+Qed.
+
+Definition Z_choiceMixin := CanChoiceMixin nzzn'.
 Module Exports.
 Definition Z_choiceType := Choice.Pack (Choice.Class Z_eqMixin Z_choiceMixin).
 End Exports.
