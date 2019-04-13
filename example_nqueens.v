@@ -89,7 +89,7 @@ Section nqueens.
 
 (* input: queen position, already threatened up/down diagonals
    output: safe or not, update up/down diagonals *)
-Definition test : Z`2 -> (seq Z)`2 -> bool_choiceType * [choiceType of (seq Z)`2] :=
+Definition test : Z`2 -> (seq Z)`2 -> bool * (seq Z)`2 :=
   fun '(c, r) '(upds, downs) =>
     let (u, d) := (r - c, r + c)%Z in
     ((u \notin upds) && (d \notin downs), (u :: upds, d :: downs)).
@@ -119,18 +119,17 @@ End purely_functional.
 Section statefully.
 (* statefully constructing the sets of up/down diagonals threatened by the queens so far *)
 
-Variable M : stateMonad [choiceType of seq Z`2].
+Variable M : stateMonad [choiceType of (seq Z)`2].
 
 Definition start2 : M bool_choiceType := Ret true.
 
-Set Printing all.
 Definition step2 (cr : Z`2) (k : M bool_choiceType) : M bool_choiceType :=
   do b' <- k ;
-  (do uds <- Get;
+  do uds <- Get;
   let (b, uds') := test cr uds in
-  (Put uds' >> Ret (b && b'): M bool_choiceType): M bool_choiceType).
+  Put uds' >> Ret (b && b').
 
-Definition safe2 : seq Z`2 -> M bool :=
+Definition safe2 : seq Z`2 -> M bool_choiceType :=
   foldr step2 start2.
 
 Lemma safe2E crs :
@@ -216,7 +215,7 @@ Arguments start2 {M}.
 
 Section safe_reification.
 
-Variable M : stateRunMonad (seq Z)`2.
+Variable M : stateRunMonad [choiceType of (seq Z)`2].
 
 Lemma run_safe2 crs updowns : Run (safe2 crs : M _) updowns = safe1 updowns crs.
 Proof.
@@ -228,9 +227,9 @@ End safe_reification.
 
 Section queens_statefully_nondeterministically.
 
-Variable M : nondetStateMonad (seq Z)`2.
+Variable M : nondetStateMonad [choiceType of (seq Z)`2].
 
-Definition queens_state_nondeter n : M (seq Z) :=
+Definition queens_state_nondeter n : M [choiceType of (seq Z)] :=
   do s <- Get ;
     do rs <- perms (map Z_of_nat (iota 0 n));
       Put empty >>
@@ -264,7 +263,7 @@ Arguments queens_state_nondeter {M}.
 
 Section queens_exploratively.
 
-Variable M : nondetStateMonad (seq Z)`2.
+Variable M : nondetStateMonad [choiceType of (seq Z)`2].
 
 Definition queens_explor n : M _ :=
   do s <- Get;
@@ -309,7 +308,7 @@ Definition step3 B cr (m : M B) := m >>
   do uds <- Get ; let (b, uds') := test cr uds in Put uds' >> guard b.
 
 Lemma safe3E crs :
-  safe3 crs = foldr (@step3 unit) skip crs :> M _.
+  safe3 crs = foldr (@step3 unit_choiceType) skip crs :> M _.
 Proof.
 (* TODO(rei): how to write this proof w.o. the "set" and "transitivity"'s? *)
 transitivity (((fun x => x >>= (guard : _ -> M _)) \o
@@ -376,7 +375,7 @@ Definition safe s := uniq (ups s 0) && uniq (downs s 0).
 Definition queens_example := [:: 3; 5; 7; 1; 6; 0; 2; 4]%Z.
 Eval compute in safe queens_example.
 
-Definition mu_queens {M : nondetMonad} n : M (seq Z) :=
+Definition mu_queens {M : nondetMonad} n : M [choiceType of (seq Z)] :=
   perms (map Z_of_nat (iota 0 n)) >>= assert safe.
 
 Definition safeAcc i (us ds : seq Z) (xs : seq Z) :=
@@ -438,13 +437,13 @@ End queens_definition.
 
 Section section_52.
 
-Variable M : nondetStateMonad (Z * seq Z * seq Z).
+Variable M : nondetStateMonad [choiceType of (Z * seq Z * seq Z)].
 
-Definition opdot_queens : Z -> M (seq Z) -> M (seq Z) := opdot queens_next queens_ok.
+Definition opdot_queens : Z -> M [choiceType of (seq Z)] -> M [choiceType of (seq Z)] := opdot queens_next queens_ok.
 
 Local Open Scope mu_scope.
 
-Definition queensBody (xs : seq Z) : M (seq Z) :=
+Definition queensBody (xs : seq Z) : M [choiceType of (seq Z)] :=
   perms xs >>= foldr opdot_queens (Ret [::]).
 
 Lemma mu_queens_state_nondeter n : mu_queens n = Get >>=
@@ -471,13 +470,13 @@ Qed.
 
 End section_52.
 
-Definition seed_select {M : nondetStateMonad (Z * seq Z * seq Z)%type} :=
-  fun (p : pred (seq Z)) (f : seq Z -> M (Z * seq Z)%type)
+Definition seed_select {M : nondetStateMonad [choiceType of (Z * seq Z * seq Z)]} :=
+  fun (p : pred (seq Z)) (f : seq Z -> M [choiceType of (Z * seq Z)])
   (a b : seq Z) => size a < size b.
 
 (* direct proof of theorem 4.2 *)
 Section theorem_42.
-Variables (M : nondetStateMonad (Z * seq Z * seq Z)%type).
+Variables (M : nondetStateMonad [choiceType of (Z * seq Z * seq Z)]).
 
 Local Open Scope mu_scope.
 
@@ -557,14 +556,14 @@ bind_ext => x.
 rewrite {1}/op /opdot_queens /opdot.
 rewrite commute_nondetState; last first.
   rewrite fmapE.
-  case: (unfoldM_is_nondetState (@select_is_nondetState _ M Z) (@decr_size_select M _) x.2).
+  case: (unfoldM_is_nondetState (@select_is_nondetState _ M Z_choiceType) (@decr_size_select M _) x.2).
   move=> m <-.
   by exists (ndBind m (fun y => ndRet (x.1 :: y))).
 rewrite {2}/op /opdot_queens /opdot.
 bind_ext => st.
 rewrite commute_nondetState //; last first.
   rewrite fmapE.
-  case: (unfoldM_is_nondetState (@select_is_nondetState _ M Z) (@decr_size_select _ _) x.2).
+  case: (unfoldM_is_nondetState (@select_is_nondetState _ M Z_choiceType) (@decr_size_select _ _) x.2).
   move=> m <-.
   by exists (ndBind m (fun y => ndRet (x.1 :: y))).
 bind_ext; case.
@@ -576,7 +575,7 @@ End theorem_42.
 
 Section section_52_contd.
 
-Variables (M : nondetStateMonad (Z * seq Z * seq Z)%type).
+Variables (M : nondetStateMonad [choiceType of (Z * seq Z * seq Z)]).
 
 Local Open Scope mu_scope.
 
