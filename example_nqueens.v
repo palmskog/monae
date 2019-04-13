@@ -7,6 +7,71 @@ From mathcomp Require Import eqtype ssrnat seq choice fintype tuple.
 From infotheo Require Import ssrZ.
 Require Import monad state_monad.
 
+(* TODO : decide if Z_choiceType should go into infothe.ssrZ *)
+Module Z_choiceType.
+(*Inductive Z : Set :=  Z0 : Z | Zpos : positive -> Z | Zneg : positive -> Z*)
+Definition zn (z : Z) : nat :=
+  match z with
+  | Z0 => 0
+  | Zpos _ => 2 * Z.abs_nat z
+  | Zneg _ => 2 * ((Z.abs_nat z) - 1) + 1
+  end.
+Definition nz (n : nat) : Z :=
+  if n is 0
+  then Z0
+  else if odd n
+       then Zneg (Pos.of_nat ((n./2) + 1))
+       else Zpos (Pos.of_nat (n./2)).
+Lemma znnz n : zn (nz n) = n.
+Proof.
+case: n => //= n.
+case H: (odd n) => //=.
+- rewrite Nat2Pos.id uphalf_half; last by rewrite H add1n.
+  by rewrite mulnC mulnDl 2!muln2 -addnn -addnA odd_double_half H add1n.
+rewrite Nat2Pos.id uphalf_half; last by rewrite addn1.
+by rewrite addnK addnC mulnDr 2!mul2n -addnn -addnA odd_double_half H add0n add1n.
+Qed.
+Lemma nzzn z : nz (zn z) = z.
+Proof.
+case: z => //= p; rewrite /nz.
+- rewrite mul2n odd_double doubleK Pos2Nat.id.
+  case: p => //=.
+  move => p; case H : (Pos.to_nat p~0); last by rewrite doubleS.
+  by move/leP:(Pos2Nat.is_pos (p~0)); rewrite -H ltnn //.
+rewrite addn1 /= mul2n odd_double /= uphalf_double subnK; last by move/leP: (Pos2Nat.is_pos p).
+by rewrite Pos2Nat.id.
+Qed.
+Let find_nat := @Choice.InternalTheory.find nat_choiceType.
+Definition find_Z (p : pred Z) (n : nat) :=
+  match (find_nat (p \o nz) n) with
+  | None => None
+  | Some n => Some (nz n)
+  end.
+Program Definition Z_choiceMixin : choiceMixin Z := (@Choice.Mixin _ find_Z _ _ _).
+Next Obligation.
+case: H; rewrite /find_Z /=.
+case H': (find_nat (P \o nz) n) => //. 
+move/Choice.InternalTheory.correct: H' => H'.
+by move/Some_inj <-.
+Qed.
+Next Obligation.
+have H1: (P \o nz) (zn H) by rewrite /= nzzn; exact: H0.
+case/Choice.InternalTheory.complete: (ex_intro (P \o nz) _ H1) => n Hn.
+exists n; rewrite /find_Z.
+case H2: (find_nat (P \o nz) n); first by reflexivity.
+by move: H2 Hn; rewrite /find_nat => ->.
+Qed.
+Next Obligation.
+rewrite /find_Z => n /=.
+have -> //: P \o nz = Q \o nz. 
+by move: H => /functional_extensionality ->.
+Qed.
+Module Exports.
+Definition Z_choiceType := Choice.Pack (Choice.Class Z_eqMixin Z_choiceMixin).
+End Exports.
+End Z_choiceType.
+Export Z_choiceType.Exports.
+
 (* from gibbons2011icfp and mu2017 *)
 
 Definition place n {B} (rs : seq B) := zip (map Z_of_nat (iota 0 n)) rs.
