@@ -263,9 +263,9 @@ Definition curry_F X : functor :=
   Functor.Pack (Functor.Class (curry_f_id X) (curry_f_comp X)).
 End curry_functor.
 
-From mathcomp Require Import boolp.
+From mathcomp Require Import boolp classical_sets.
 
-Section fun_choiceType.
+(*Section fun_choiceType.
 
 Definition fun_eqMixin (T1 T2 : eqType) : Equality.mixin_of (T1 -> T2).
 Proof.
@@ -279,7 +279,7 @@ Axiom fun_choiceMixin : forall (T1 T2 : choiceType), choiceMixin (T1 -> T2).
 Canonical fun_choiceType (T1 T2 : choiceType) :=
   Eval hnf in ChoiceType (T1 -> T2) (@fun_choiceMixin T1 T2).
 
-End fun_choiceType.
+End fun_choiceType. *)
 
 Section uncurry_functor.
 Definition uncurry_M (X : choiceType) : choiceType -> Type := fun B => [choiceType of X -> B].

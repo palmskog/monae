@@ -20,9 +20,11 @@ Reserved Notation "'p_do' x <- m ; e"
 Reserved Notation "'p_do' x : T <- m ; e"
   (at level 60, x ident, m at level 200, e at level 60).
 
+From mathcomp Require Import ssrbool eqtype choice boolp.
+
 Section Syntax.
 
-Variables (T : Type) (S : choiceType).
+Variables (T S : choiceType).
 
 Inductive program : choiceType -> Type :=
 | p_ret  : forall {A : choiceType}, A -> program A
@@ -40,6 +42,12 @@ Local Notation "'p_do' x : T <- m ; e" :=(p_bind m (fun x : T => e)).
 Inductive continuation : Type :=
 | stop : forall (A : Type), A -> continuation
 | cont : forall (A : choiceType), program A -> (A -> continuation) -> continuation.
+
+Definition cont_eqMixin : Equality.mixin_of continuation.
+Admitted.
+Definition cont_choiceMixin := @gen_choiceMixin continuation.
+Fail Definition cont_choiceType : choiceType :=
+  Choice.Pack (Choice.Class cont_eqMixin cont_choiceMixin).
 
 End Syntax.
 
@@ -63,7 +71,7 @@ Notation "p `; k" := (@cont _ _ _ p k) (at level 50).
 
 Section OperationalSemantics.
 
-Variables (T : Type) (S : choiceType).
+Variables (T S : choiceType).
 
 Definition state : Type := S * @continuation T S.
 

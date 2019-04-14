@@ -101,7 +101,7 @@ End set.
 
 Section state.
 Variables (S T : choiceType).
-Let m0 := fun A : choiceType => fun_choiceType [choiceType of S * list T] [choiceType of A * (S * list T)].
+Let m0 := fun A : choiceType => [choiceType of (S * list T) -> (A * (S * list T))].
 Definition state : monad.
 refine (@Monad_of_bind_ret m0
   (fun A B m f => fun s => let (a, s') := m s in f a s') (* bind *)
@@ -259,8 +259,8 @@ Definition mk {S T : choiceType} :
   stateTraceRunMonad S T.
 refine (let stm := @ModelStateTrace.mk S T in
         let run := @ModelRun.mk S T in
-@MonadStateTraceRun.Pack S T (fun A : choiceType => fun_choiceType [choiceType of S * list T] [choiceType of A * (S * list T)])
-  (@MonadStateTraceRun.Class S T (fun A : choiceType => fun_choiceType [choiceType of S * list T] [choiceType of A * (S * list T)])
+@MonadStateTraceRun.Pack S T (fun A : choiceType => [choiceType of (S * list T) -> (A * (S * list T))])
+  (@MonadStateTraceRun.Class S T (fun A : choiceType => [choiceType of (S * list T) -> (A * (S * list T))])
     (MonadStateTrace.class stm)
     (MonadRun.mixin (MonadRun.class run))
     (@MonadStateTraceRun.Mixin _ _ run _ _ _ _ _ _))).

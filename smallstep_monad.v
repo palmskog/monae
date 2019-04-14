@@ -12,20 +12,20 @@ Set Bullet Behavior "Strict Subproofs".
 
 Section DenotationalSemantics.
 
-Variables (S : choiceType) (T : Type).
+Variables (S T : choiceType).
 Variable M : stateTraceRunMonad S T.
 
 Fixpoint denote {A : choiceType} (p : program A) : M A :=
   match p with
-  | p_ret A v => Ret v
+  | p_ret _ v => Ret v
   | p_bind _ _ m f => do a <- denote m; denote (f a)
   | p_cond _ b p1 p2 => if b then denote p1 else denote p2
-  | p_repeat n p => (fix loop (m : nat) : M unit :=
+  | p_repeat n p => (fix loop (m : nat) : M unit_choiceType :=
     match m with
     | 0 => Ret tt
     | Datatypes.S m' => denote p >> loop m'
     end) n
-  | p_while fuel c p => (fix loop (m : nat) : M unit :=
+  | p_while fuel c p => (fix loop (m : nat) : M unit_choiceType :=
     match m with
     | 0 => Ret tt
     | Datatypes.S m' =>
