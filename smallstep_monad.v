@@ -53,19 +53,23 @@ Notation "'While' fuel @ c {{ p }}" := (
      if c s then denote p >> loop m' else Ret tt
    end) fuel) (at level 200).
 
-Fixpoint denote_continuation (k : continuation) : M (@continuation T S) :=
+(* yyy
+Fixpoint denote_continuation (k : continuation) : M (continuation T S) :=
   match k with
   | stop A a => Ret (stop A a)
   | p `; f =>
       do a <- denote p ;
       denote_continuation (f a)
   end.
+*)
 
-Definition stateTrace_sub {A : Type} (m : M A) : Type :=
+Definition stateTrace_sub {A : choiceType} (m : M A) : Type :=
   { p | denote p = m }.
 
+(* yyy
 Definition continuation_sub (m : M continuation) : Type :=
   {k | denote_continuation k = m }.
+*)
 
 Lemma denote_prefix_preserved A (m : M A) :
   stateTrace_sub m -> forall s s' l1 l a,
@@ -186,6 +190,7 @@ by rewrite IH2.
 - by rewrite !runstmark rcons_cat.
 Qed.
 
+(* yyy
 Lemma denote_continuation_prefix_independent m :
   continuation_sub m -> forall s l1 l2,
   Run m (s, l1 ++ l2) =
@@ -201,7 +206,9 @@ rewrite denote_prefix_independent /=; [ | now exists p ].
 destruct (Run (denote p) (s, l2)) as [ a (s', l) ].
 by rewrite IH.
 Qed.
+*)
 
+(* yyy
 Lemma step_None_correct s s' k k' l :
   step (s, k) None (s', k') ->
   Run (denote_continuation k) (s, l) = Run (denote_continuation k') (s', l).
@@ -251,7 +258,9 @@ induction Hstep as
   by rewrite /= runbind runstput.
 - discriminate Heqo.
 Qed.
+*)
 
+(** yyy
 Lemma step_Some_correct s s' k k' t l :
   step (s, k) (Some t) (s', k') ->
   Run (denote_continuation k) (s, l) =
@@ -304,9 +313,11 @@ induction Hstep_star as
   rewrite denote_continuation_prefix_independent; [ reflexivity | ].
   now eexists.
 Qed.
+*)
 
+(* yyy
 Proposition step_star_correct
-  (s s' : S) (A : Type) (a : A) (p : program A) (l : list T) :
+  (s s' : S) (A : choiceType) (a : A) (p : program A) (l : list T) :
   step_star (s, p `; stop A) l (s', stop A a) ->
   Run (denote p) (s, []) = (a, (s', l)).
 Proof.
@@ -320,9 +331,10 @@ injection Hss; clear Hss; intros Heq1 Heq2 Heq3.
 apply inj_pair2 in Heq3.
 congruence.
 Qed.
+*)
 
 Lemma step_star_complete_gen
-  (s s' : S) (A : Type) (a : A) (p : program A) (l1 l2 : list T) f :
+  (s s' : S) (A : choiceType) (a : A) (p : program A) (l1 l2 : list T) f :
   Run (denote p) (s, l1) = (a, (s', l1 ++ l2)) ->
   step_star (s, p `; f) l2 (s', f a).
 Proof.
@@ -461,7 +473,7 @@ induction p as [ A a | A B p IHp g IHg | A b p1 IHp1 p2 IHp2 |
 Qed.
 
 Proposition step_star_complete
-  (s s' : S) (A : Type) (a : A) (p : program A) (l : list T) :
+  (s s' : S) (A : choiceType) (a : A) (p : program A) (l : list T) :
   Run (denote p) (s, []) = (a, (s', l)) ->
   step_star (s, p `; stop A) l (s', stop A a).
 Proof.

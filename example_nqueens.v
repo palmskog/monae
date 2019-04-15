@@ -75,7 +75,7 @@ Definition step1 : Z`2 -> (bool * (seq Z)`2) -> bool * (seq Z)`2 :=
 Definition safe1 : (seq Z)`2 -> seq Z`2 -> bool * (seq Z)`2 :=
   foldr step1 \o start1.
 
-Definition queens {M : nondetMonad} n : M [choiceType of seq Z] :=
+Definition queens {M : nondetMonad} (n : nat) : M [choiceType of seq Z] :=
   do rs <- perms (map Z_of_nat (iota 0 n)) ;
      (guard (safe1 empty (place n rs)).1 >> Ret rs).
 

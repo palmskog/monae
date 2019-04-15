@@ -5,7 +5,7 @@
 
 Require Import Eqdep JMeq List ssreflect.
 Import ListNotations.
-From mathcomp Require Import choice.
+From mathcomp Require Import eqtype choice.
 
 Set Universe Polymorphism.
 Unset Universe Minimization ToSet.
@@ -36,6 +36,18 @@ Inductive program : choiceType -> Type :=
 | p_put  : S -> program unit_choiceType
 | p_mark : T -> program unit_choiceType.
 
+Definition program_eqMixin (A : choiceType) : Equality.mixin_of (program A).
+Proof.
+apply: (@Equality.Mixin _ (fun c0 c1 => `[< c0 = c1 >])) => c0 c1.
+by apply: (iffP idP) => /asboolP.
+Qed.
+Fail Canonical program_eqType (A : choiceType) :=
+  Equality.Pack (program_eqMixin A).
+Definition program_choiceMixin (A : choiceType) :=
+  @gen_choiceMixin (program A).
+Fail Canonical program_choiceType (A : choiceType) : choiceType :=
+  Choice.Pack (Choice.Class (program_eqMixin A) (program_choiceMixin A)).
+
 Local Notation "'p_do' x <- m ; e" := (p_bind m (fun x => e)).
 Local Notation "'p_do' x : T <- m ; e" :=(p_bind m (fun x : T => e)).
 
@@ -44,9 +56,13 @@ Inductive continuation : Type :=
 | cont : forall (A : choiceType), program A -> (A -> continuation) -> continuation.
 
 Definition cont_eqMixin : Equality.mixin_of continuation.
-Admitted.
+Proof.
+apply: (@Equality.Mixin _ (fun c0 c1 => `[< c0 = c1 >])) => c0 c1.
+by apply: (iffP idP) => /asboolP.
+Qed.
+Fail Canonical cont_eqType := Equality.Pack cont_eqMixin.
 Definition cont_choiceMixin := @gen_choiceMixin continuation.
-Fail Definition cont_choiceType : choiceType :=
+Fail Canonical cont_choiceType : choiceType :=
   Choice.Pack (Choice.Class cont_eqMixin cont_choiceMixin).
 
 End Syntax.

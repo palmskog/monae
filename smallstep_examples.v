@@ -2,7 +2,8 @@
   Concrete examples of programs and their small-step and denotational semantics.
 *)
 
-Require Import ZArith List ssreflect.
+Require Import ZArith List.
+From mathcomp Require Import ssrfun ssreflect ssrbool eqtype choice.
 Import ListNotations.
 Require Import monad state_monad trace_monad.
 Require Import smallstep smallstep_monad monad_model.
@@ -10,7 +11,7 @@ Require Import smallstep smallstep_monad monad_model.
 Notation "'eT' x y" := (@existT _ _ x y) (at level 200).
 Notation "'e' x" := (@exist _ _ x _) (at level 200).
 
-Definition p_nonce : program nat :=
+Definition p_nonce : program nat_choiceType :=
   p_do n <- p_get;
   p_do _ <- p_put (S n);
   p_do _ <- p_mark n;
@@ -18,22 +19,22 @@ Definition p_nonce : program nat :=
 
 Let M := @ModelStateTraceRun.mk.
 
-Eval unfold denote, p_nonce in denote (M nat nat) nat p_nonce.
+Eval unfold denote, p_nonce in denote (M nat_choiceType nat_choiceType) nat_choiceType p_nonce.
 
-Definition nonce : M nat nat nat :=
+Definition nonce : M nat_choiceType nat_choiceType nat_choiceType :=
   do n : nat <- stGet;
   do _ : unit <- stPut (S n);
   do _ : unit <- stMark n;
   Ret n.
 
 Compute nonce (0, []).
-Compute (denote (M nat nat) nat p_nonce) (0, []).
+Compute (denote (M nat_choiceType nat_choiceType) nat_choiceType p_nonce) (0, []).
 Compute run_ss p_nonce 0.
 
-Remark denote_p_nonce : denote (M nat nat) nat p_nonce = nonce.
+Remark denote_p_nonce : denote (M nat_choiceType nat_choiceType) nat_choiceType p_nonce = nonce.
 Proof. by []. Qed.
 
-Program Example p_nonce_twice : program bool :=
+Program Example p_nonce_twice : program bool_choiceType :=
   p_do nonce <- p_ret (
     p_do n : nat <- p_get;
     p_do _ : unit <- p_put (S n);
