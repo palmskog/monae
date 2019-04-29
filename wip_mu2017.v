@@ -109,12 +109,24 @@ induction y => m.
   rewrite bindA.
   bind_ext; case.
   bind_ext; case.
-  rewrite {1}fmap_def.
-  rewrite_ fmap_def.
+  rewrite {1}fmapE.
+  rewrite_ fmapE.
   by rewrite_ bindretf.
 Qed.
 
 End Lemma54.
+
+Reserved Notation "f ($) m" (at level 11).
+Reserved Notation "f =<< m" (at level 50).
+Reserved Notation "n <=< m" (at level 50).
+Section tmp.
+Variable M : monad.
+Definition rbind A B (f : A -> M B) (m : M A) : M B := m >>= f.
+Definition rkleisli A B C (f : A -> M B) (g : B -> M C) : A -> M C := g >=> f.
+End tmp.
+Notation "f ($) m" := (fmap f m) : mu_scope.
+Notation "f =<< m" := (rbind f m) : mu_scope.
+Notation "n <=< m" := (rkleisli n m) : mu_scope.
 
 (* actually a specialization of section 4.4 of mu2017,
    to a seeding function returning lists *)
@@ -173,8 +185,7 @@ transitivity (do xz <- f y; unfoldM p f xz.2 >>= foldr op (Ret e) >>= (op xz.1 \
 transitivity (do xz <- f y; op xz.1 (unfoldM p f xz.2 >>= foldr op (Ret e))).
   bind_ext => ba.
    by rewrite H1.
-bind_ext => ba.
-by rewrite /kleisli /= join_fmap.
+by bind_ext => ba.
 Qed.
 
 Lemma theorem_42 : (forall x m, op x m = m >>= (op x \o Ret)) ->

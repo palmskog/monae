@@ -54,7 +54,7 @@ Lemma lemma_2 b : let op' a b := op b a in
 Proof.
 move=> op'.
 apply functional_extensionality; elim => [|h t IH].
-  by rewrite fcompE fmap_retE.
+  by rewrite fcompE fmapE bindretf.
 rewrite fcompE /= fmap_bind lemma_1.
 transitivity (do x <- perm t; (Ret \o (fun x => op' h x) \o foldr op' b) x : M _).
   by [].
@@ -123,7 +123,7 @@ Lemma lemma_11_a s :
 Proof.
 move=> Hadd H1; apply (@Ret_inj M).
 move/(congr1 (fun x => x s)) : H1 => /= <-.
-by rewrite /aggregate fcomp_def compA /= -fcompE (@lemma_34 M _ _ _ Hadd b).
+by rewrite /aggregate fcomp_def compA -fcomp_def (@lemma_34 M _ _ _ Hadd b).
 Qed.
 
 Lemma lemma_11_b s s' (m : M _) :
@@ -133,14 +133,13 @@ Lemma lemma_11_b s s' (m : M _) :
 Proof.
 move=> H1 H2.
 have /esym H : Ret ((foldl mul b \o flatten) s) =
-    (foldl add b \o map (foldl mul b)) ($) Ret s' [~]
-    (foldl add b \o map (foldl mul b)) ($) m.
+    fmap (foldl add b \o map (foldl mul b)) (Ret s') [~]
+    fmap (foldl add b \o map (foldl mul b)) m.
   move/(congr1 (fun x => x s)) : H1 => /= <-.
   by rewrite /aggregate perm_map -fcomp_comp fcompE H2 alt_fmapDl.
 apply (@Ret_inj M).
 case: (alt_Ret H) => <- _.
-rewrite -(compE (fmap _)).
-by rewrite fmap_ret.
+by rewrite -(compE (fmap _)) /= fmapE bindretf.
 Qed.
 
 Definition prop_In1 {T1 T2} (d : T2 -> T1) (P : T1 -> Prop) :=
