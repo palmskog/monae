@@ -27,6 +27,8 @@ Inductive program : Type -> Type :=
 | p_ret  : forall {A}, A -> program A
 | p_bind : forall {A B}, program A -> (A -> program B) -> program B
 | p_cond : forall {A}, bool -> program A -> program A -> program A
+| p_repeat : nat -> program unit -> program unit
+| p_while : nat -> (S -> bool) -> program unit -> program unit
 | p_get  : program S
 | p_put  : S -> program unit
 | p_mark : T -> program unit.
@@ -44,6 +46,8 @@ Arguments program {_ _} _.
 Arguments p_ret {_ _ _} _.
 Arguments p_bind {_ _ _ _} _ _.
 Arguments p_cond {_ _ _} _ _ _.
+Arguments p_repeat {_ _} _ _.
+Arguments p_while {_ _} _ _ _.
 Arguments p_get {_ _}.
 Arguments p_put {_ _} _.
 Arguments p_mark {_ _} _.
@@ -64,15 +68,34 @@ Definition state : Type := S * @continuation T S.
 
 Inductive step : state -> option T -> state -> Prop :=
 | s_ret  : forall s A a (k : A -> _), step (s, p_ret a `; k) None (s, k a)
-| s_bind : forall s A B p f (k : B -> _),
-  step (s, p_bind p f `; k) None (s, p `; fun a : A => f a `; k)
+| s_bind : forall s A B p (f : A -> program B) k,
+  step (s, p_bind p f `; k) None (s, p `; fun a => f a `; k)
 | s_cond_true : forall s A p1 p2 (k : A -> _),
   step (s, p_cond true p1 p2 `; k) None (s, p1 `; k)
 | s_cond_false : forall s A p1 p2 (k : A -> _),
   step (s, p_cond false p1 p2 `; k) None (s, p2 `; k)
+| s_repeat_O : forall s p k, step (s, p_repeat O p `; k) None (s, k tt)
+| s_repeat_S : forall s n p k,
+  step (s, p_repeat (Datatypes.S n) p `; k) None
+    (s, p `; fun _ => p_repeat n p `; k)
+| s_while_true : forall fuel s c p k, c s = true ->
+  step (s, p_while (Datatypes.S fuel) c p `; k) None
+    (s, p `; fun _ => p_while fuel c p `; k)
+| s_while_false : forall fuel s c p k, c s = false ->
+  step (s, p_while (Datatypes.S fuel) c p `; k) None (s, k tt)
+| s_while_broke : forall s c p k, step (s, p_while O c p `; k) None (s, k tt)
 | s_get  : forall s k, step (s, p_get `; k) None (s, k s)
 | s_put  : forall s s' k, step (s, p_put s' `; k) None (s', k tt)
 | s_mark : forall s t k, step (s, p_mark t `; k) (Some t) (s, k tt).
+
+Inductive step_n : nat -> state -> list T -> state -> Prop :=
+| sn_0 : forall sk, step_n O sk [] sk
+| sn_S_None : forall n sk1 sk2 sk3 l,
+  step sk1 None sk2 -> step_n n sk2 l sk3 ->
+  step_n (Datatypes.S n) sk1 l sk3
+| sn_S_Some : forall n sk1 sk2 sk3 t l,
+  step sk1 (Some t) sk2 -> step_n n sk2 l sk3 ->
+  step_n (Datatypes.S n) sk1 (t :: l) sk3.
 
 Inductive step_star : state -> list T -> state -> Prop :=
 | ss_refl : forall sk, step_star sk [] sk
@@ -123,7 +146,7 @@ match goal with
 end; subst;
 repeat match goal with
 | H : existT _ _ _ = existT _ _ _ |- _ => apply inj_pair2 in H
-end; subst; repeat split.
+end; subst; repeat split; congruence.
 Qed.
 
 Lemma step_star_confluent ski sk1 sk2 l1 l2 :
@@ -212,12 +235,62 @@ subst.
 repeat split.
 Qed.
 
+Definition run_s {A : Type} (p : program A) (f : A -> continuation) (s : S) :
+  {o & {f' & {s' | step (s, p `; f) o (s', f') } } }.
+Proof.
+destruct p as [ A a | A B p g | A b p1 p2 | n p | fuel c p | | s' | t ];
+ try (repeat eexists; constructor).
+- destruct b; repeat eexists; constructor.
+- destruct n; repeat eexists; constructor.
+- destruct fuel.
+  + repeat eexists; constructor.
+  + case_eq (c s); intro Hcs; repeat eexists.
+    * apply s_while_true.
+      exact Hcs.
+    * apply s_while_false.
+      exact Hcs.
+Defined.
+
+Definition run_s_n (n : nat)
+  {A : Type} (p : program A) (f : A -> continuation) (s : S) :
+  option {l & {f' & {s' | step_n n (s, p `; f) l (s', f') } } }.
+Proof.
+revert n A p f s.
+fix run_s_n 1.
+intros [ | n' ] A p f s.
+- apply Some.
+  exists []. exists (cont A p f). exists s.
+  apply sn_0.
+- destruct (run_s p f s) as (o & [ B b | B p' f' ] & s' & Hstep).
+  + destruct n' as [ | n'' ].
+    * apply Some.
+      destruct o as [ t | ]; repeat eexists.
+      -- eapply sn_S_Some.
+         ++ exact Hstep.
+         ++ apply sn_0.
+      -- eapply sn_S_None.
+         ++ exact Hstep.
+         ++ apply sn_0.
+    * apply None.
+  + destruct (run_s_n n' B p' f' s') as [ (l & f'' & s'' & Hstep_n') | ].
+    * apply Some.
+      destruct o as [ t | ]; repeat eexists.
+      -- eapply sn_S_Some.
+         ++ exact Hstep.
+         ++ exact Hstep_n'.
+      -- eapply sn_S_None.
+         ++ exact Hstep.
+         ++ exact Hstep_n'.
+    * exact None.
+Defined.
+
 Definition run_gen
   {A : Type} (p : program A) (f : A -> continuation) (s : S) :
   {l & {a : A & {s' | step_star (s, p `; f) l (s', f a) } } }.
 Proof.
 revert f s.
-induction p as [ A a | A B p IHp g IHg | A b p1 IHp1 p2 IHp2 | | s' | t ];
+induction p as [ A a | A B p IHp g IHg | A b p1 IHp1 p2 IHp2 |
+  n p IHp | fuel c p IHp | | s' | t ];
  intros f s.
 - exists []. exists a. exists s.
   abstract (eapply ss_step_None; [ apply s_ret | apply ss_refl ]).
@@ -243,6 +316,27 @@ induction p as [ A a | A B p IHp g IHg | A b p1 IHp1 p2 IHp2 | | s' | t ];
     exists a.
     exists s'.
     abstract (eapply ss_step_None; [ apply s_cond_false | apply Hss ]).
+- revert s.
+  induction n as [ | n' IHn ]; intro s.
+  + exists []; exists tt; exists s.
+    abstract (eapply ss_step_None; [ apply s_repeat_O | apply ss_refl ]).
+  + destruct (IHp (fun _ => p_repeat n' p `; f) s) as (l1 & a1 & s1 & Hss1).
+    destruct (IHn s1) as (l2 & a2 & s2 & Hss2).
+    exists (l1 ++ l2); exists a2; exists s2.
+    eapply ss_step_None; [ apply s_repeat_S | ].
+    eapply step_star_transitive; [ eexact Hss1 | exact Hss2 ].
+- revert s.
+  induction fuel as [ | fuel' IHfuel ]; intro s.
+  + exists []; exists tt; exists s.
+    abstract (eapply ss_step_None; [ apply s_while_broke | apply ss_refl ]).
+  + case_eq (c s); [ intro Htrue | intro Hfalse ].
+    * destruct (IHp (fun _ => p_while fuel' c p `; f) s) as (l1 & a1 & s1 & Hss1).
+      destruct (IHfuel s1) as (l2 & a2 & s2 & Hss2).
+      exists (l1 ++ l2); exists a2; exists s2.
+      eapply ss_step_None; [ apply s_while_true; exact Htrue | ].
+      eapply step_star_transitive; [ eexact Hss1 | exact Hss2 ].
+    * exists []; exists tt; exists s.
+      abstract (eapply ss_step_None; [ apply s_while_false; exact Hfalse | apply ss_refl ]).
 - exists []. exists s. exists s.
   abstract (eapply ss_step_None; [ apply s_get | apply ss_refl ]).
 - exists []. exists tt. exists s'.
@@ -260,4 +354,6 @@ End OperationalSemantics.
 
 Arguments step {_ _} _ _ _.
 Arguments step_star {_ _} _ _ _.
+Arguments run_s {_ _ _} _ _ _.
+Arguments run_s_n {_ _} _ {_} _ _ _.
 Arguments run_ss {_ _ _} _ _.

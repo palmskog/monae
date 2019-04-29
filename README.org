@@ -1,25 +1,36 @@
 * Monadic equational reasoning in Coq
 
-This repository contains a formalization of monadic equational
-reasoning with several examples:
-- formalization of [Gibbons and Hinze, Just do It: Simple Monadic Equational Reasoning, ICFP 2011]
-  + except Sect. 10.2
-- formalization of [Gibbons, Unifying Theories of Programming with Monads, UTP 2012]
-  + up to Sect. 7.2
-- formalization of [Mu, Functional Pearls: Reasoning and Derivation of Monadic Programs, A case study of non-determinism and state, 2017]
-  + up to Sect. 5
-- an application to program semantics
+This repository contains a formalization of monads including several
+models, examples of monadic equational reasoning, and an application
+to program semantics.
+
+Formalized papers:
+- [Gibbons and Hinze, Just do It: Simple Monadic Equational Reasoning, ICFP 2011] (except Sect. 10.2)
+- [Gibbons, Unifying Theories of Programming with Monads, UTP 2012] (up to Sect. 7.2)
+- [Mu, Functional Pearls: Reasoning and Derivation of Monadic Programs, A case study of non-determinism and state, 2017] (up to Sect. 5)
+- [Jones and Duponcheel, Composing Monads, Yale RR 1993] (Sections 2 and 3)
+
+Other reference:
+- [Cheung, Distributive Interaction of Algebraic Effects, PhD Thesis, U. Oxford, 2017]
 
 ** Files
 
 - [[monad.v][monad.v]]: basics of monadic equational reasoning
 - [[state_monad.v][state_monad.v]]: about the state monad
 - [[proba_monad.v][proba_monad.v]]: about the probability monad
+<<<<<<< HEAD
 - [[trace_monad.v][trace_monad.v]]: about the state-trace monad
 - [[monad_model.v][monad_model.v]]: concrete models of monads
 - [[finmonad.v][finmonad.v]]: a monad hierarchy with finType
 - [[finmonad_model.v][finmonad_model.v]]: models of the backtrackable-state and the probability monads
   + see Requirements for compilation information
+=======
+- [[monad_composition.v][monad_composition.v]]: composing monads
+- [[model.v][model.v]]: definition common to ~*_model.v~ files
+- [[monad_model.v][monad_model.v]]: concrete models of monads (corresponding to ~{,state_,trace_}monad.v~)
+- [[proba_monad_model.v][proba_monad_model.v]]: concrete model of the probability monad
+- [[altprob_model.v][altprob_model.v]]: model of combined choice
+>>>>>>> master
 - [[example_spark.v][example_spark.v]]: example of Spark aggregation
 - [[example_nqueens.v][example_nqueens.v]]: example of the n-queens puzzle
 - [[example_relabeling.v][example_relabeling.v]]: example of tree relabeling
@@ -27,6 +38,7 @@ reasoning with several examples:
 - [[smallstep.v][smallstep.v]]: semantics for an imperative language
 - [[smallstep_monad.v][smallstep_monad.v]]: equivalence operational semantics/denotation
 - [[smallstep_examples.v][smallstep_examples.v]]: sample imperative programs
+<<<<<<< HEAD
 - ssrZ.v: SSReflect-like interface for the type Z of the standard library of Coq
   + comes from https://github.com/affeldt-aist/seplog
   + copied verbatim here for convenience
@@ -37,8 +49,19 @@ reasoning with several examples:
 - the compilation of [[finmonad_model.v][finmonad_model.v]] requires the installation of
   another library called [[https://github.com/affeldt-aist/infotheo][infotheo]]
   + if infotheo is not installed, just remove ~finmonad_model.v~ from ~_CoqProject~
+=======
+
+** Requirements
+
+- [[https://coq.inria.fr][Coq]] 8.9.0
+- [[https://github.com/math-comp/math-comp][Mathematical Components library]] 1.8.0
+- [[https://github.com/math-comp/analysis][MathComp-Analysis]] github master version
+  which requires
+  + [[https://github.com/math-comp/bigenough/][bigenough]] first release
+  + [[https://github.com/math-comp/finmap][finmap]] 1.2.0
+- [[https://github.com/affeldt-aist/infotheo][infotheo]] github master version
+>>>>>>> master
 
 ** Installation
 
-1. ~coq_makefile -f _CoqProject -o Makefile~
-2. ~make~
+1. ~make~

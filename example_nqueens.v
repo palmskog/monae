@@ -1,10 +1,8 @@
-Require Import FunctionalExtensionality Coq.Program.Tactics ProofIrrelevance.
-Require Import Coq.Logic.IndefiniteDescription.
-Require Classical.
-Require Import ssreflect ssrmatching ssrfun ssrbool.
+Require Import ZArith ssreflect ssrmatching ssrfun ssrbool.
 From mathcomp Require Import eqtype ssrnat seq choice fintype tuple.
-Require Import ZArith.
-Require Import ssrZ monad state_monad.
+From mathcomp Require Import boolp.
+From infotheo Require Import ssrZ.
+Require Import monad state_monad.
 
 (* from gibbons2011icfp and mu2017 *)
 
@@ -415,10 +413,10 @@ Let p := @nilp Z.
 Lemma base_case y : p y -> (foldr op (Ret [::]) >=> unfoldM p select) y = Ret [::].
 Proof.
 move=> py.
-transitivity (foldr op (Ret [::]) =<< Ret [::]).
-  rewrite /kleisli /rbind bindretf /= join_fmap unfoldME; last exact: decr_size_select.
+transitivity (Ret [::] >>= foldr op (Ret [::])).
+  rewrite /kleisli bindretf /= join_fmap unfoldME; last exact: decr_size_select.
   by rewrite py bindretf.
-by rewrite /rbind bindretf.
+by rewrite bindretf.
 Qed.
 
 Lemma theorem_42 :
@@ -429,7 +427,7 @@ apply: (well_founded_induction (@well_founded_size _)) => y IH.
 rewrite hyloME; last exact: decr_size_select.
 case/boolP : (p y) => py.
   by rewrite base_case.
-rewrite /rkleisli /kleisli /= join_fmap.
+rewrite /kleisli /= join_fmap.
 rewrite unfoldME; last exact: decr_size_select.
 rewrite (negbTE py) bindA.
 rewrite(@decr_size_select _ _) /bassert !bindA; bind_ext => -[b a] /=.
@@ -443,30 +441,30 @@ move: a b.
 apply: (well_founded_induction (@well_founded_size _)) => a IH' b.
 destruct a as [|u v] => //.
   rewrite unfoldME /=; last exact: decr_size_select.
-  by rewrite !bindretf /=.
-rewrite unfoldME /=; last exact: decr_size_select.
+  by rewrite !bindretf.
+rewrite unfoldME; last exact: decr_size_select.
 rewrite !bindA.
 transitivity (do x <- Ret (u, v) [~] (do y_ys <- select v; Ret (y_ys.1, u :: y_ys.2));
-  op b (do x0 <- cons x.1 ($) unfoldM p select x.2; foldr op (Ret [::]) x0)); last first.
+  op b (do x0 <- fmap (cons x.1) (unfoldM p select x.2); foldr op (Ret [::]) x0)); last first.
   apply/esym.
   rewrite {1}/op /opdot_queens /opdot fmap_bind.
   transitivity (do st <- Get;
   (guard (queens_ok (queens_next st b)) >> do x <- Ret (u, v) [~] (do y_ys <- select v; Ret (y_ys.1, u :: y_ys.2));
    (Put (queens_next st b)) >>
   ((cons b
-    (o) (fun x : Z * seq Z => do x0 <- cons x.1 ($) unfoldM p select x.2; foldr op (Ret [::]) x0)) x))).
+    (o) (fun x : Z * seq Z => do x0 <- fmap (cons x.1) (unfoldM p select x.2); foldr op (Ret [::]) x0)) x))).
     bind_ext => st.
     rewrite !bindA.
     bind_ext; case.
     rewrite -commute_nondetState //.
-    case: (@select_is_nondetState _ M _ v) => x <-.
+    case: (@select_is_nondetState _ M _ v) => x /= <-.
     by exists (ndAlt (ndRet (u, v)) (ndBind x (fun y => ndRet (y.1, u :: y.2)))).
   transitivity (do st <- Get;
   (do x <- Ret (u, v) [~] (do y_ys <- select v; Ret (y_ys.1, u :: y_ys.2)) : M _;
   guard (queens_ok (queens_next st b)) >>
    Put (queens_next st b) >>
    (cons b
-    (o) (fun x0 : Z * seq Z => do x1 <- cons x0.1 ($) unfoldM p select x0.2; foldr op (Ret [::]) x1))
+    (o) (fun x0 : Z * seq Z => do x1 <- fmap (cons x0.1) (unfoldM p select x0.2); foldr op (Ret [::]) x1))
      x)).
     bind_ext => st.
     rewrite -bindA guardsC; last exact: bindmfail.
@@ -482,14 +480,14 @@ transitivity (do x <- Ret (u, v) [~] (do y_ys <- select v; Ret (y_ys.1, u :: y_y
 bind_ext => x.
 rewrite {1}/op /opdot_queens /opdot.
 rewrite commute_nondetState; last first.
-  rewrite fmap_def.
+  rewrite fmapE.
   case: (unfoldM_is_nondetState (@select_is_nondetState _ M Z) (@decr_size_select M _) x.2).
   move=> m <-.
   by exists (ndBind m (fun y => ndRet (x.1 :: y))).
 rewrite {2}/op /opdot_queens /opdot.
 bind_ext => st.
 rewrite commute_nondetState //; last first.
-  rewrite fmap_def.
+  rewrite fmapE.
   case: (unfoldM_is_nondetState (@select_is_nondetState _ M Z) (@decr_size_select _ _) x.2).
   move=> m <-.
   by exists (ndBind m (fun y => ndRet (x.1 :: y))).
@@ -509,31 +507,28 @@ Local Open Scope mu_scope.
 Lemma queensBodyE : queensBody M =
   hyloM (@opdot_queens M) [::] (@nilp _) select seed_select (@well_founded_size _).
 Proof.
-rewrite /queensBody; apply functional_extensionality.
-case => [|h t].
-  rewrite /= permsE /= hyloME; last 2 first.
-    by rewrite bindretf.
-    exact: decr_size_select.
-rewrite [h :: t]lock -theorem_42.
-by rewrite /kleisli /= join_fmap perms_mu_perm.
+rewrite /queensBody funeqE => -[|h t].
+- rewrite /= permsE /= hyloME ?bindretf //; exact: decr_size_select.
+- by rewrite [h :: t]lock -theorem_42 /kleisli /= join_fmap perms_mu_perm.
 Qed.
 
 Lemma queensBodyE' xs : queensBody M xs = if xs is [::] then Ret [::] else
   select xs >>= (fun xys =>
   Get >>= (fun st => guard (queens_ok (queens_next st xys.1)) >>
-  Put (queens_next st xys.1) >> (cons xys.1 ($) queensBody M xys.2))).
+  Put (queens_next st xys.1) >> (fmap (cons xys.1) (queensBody M xys.2)))).
 Proof.
 case: xs => [|h t].
   rewrite queensBodyE // hyloME //; exact: decr_size_select.
 rewrite {1}queensBodyE hyloME; last exact: decr_size_select.
-rewrite {-1}[h :: t]lock /= decr_size_select /bassert 2!bindA.
-bind_ext => -[x ys] /=.
-rewrite /assert /guard /=.
+rewrite {-1}[h :: t]lock decr_size_select /bassert 2!bindA.
+rewrite (_ : nilp _ = false) //.
+bind_ext => -[x ys].
+rewrite /assert /guard.
 case: ifPn => ysht; last by rewrite !bindfailf.
 rewrite bindskipf !bindretf /opdot_queens /opdot.
 bind_ext => st.
 rewrite !bindA; bind_ext; case.
-bind_ext; case => /=.
+bind_ext; case.
 by rewrite queensBodyE.
 Qed.
 

@@ -1,10 +1,8 @@
-Require Import FunctionalExtensionality Coq.Program.Tactics ProofIrrelevance.
-Require Import Coq.Logic.IndefiniteDescription.
-Require Classical.
-Require Import ssreflect ssrmatching ssrfun ssrbool.
+Require Import ZArith ssreflect ssrmatching ssrfun ssrbool.
 From mathcomp Require Import eqtype ssrnat seq choice fintype tuple.
-Require Import ZArith.
-Require Import ssrZ monad.
+From mathcomp Require Import boolp.
+From infotheo Require Import ssrZ.
+Require Import monad.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -16,6 +14,7 @@ Unset Printing Implicit Defensive.
 - Module MonadNondetState.
 - Module MonadFresh.
 - Module MonadFailFresh.
+- Module MonadArray.
 *)
 
 Module MonadState.
@@ -25,7 +24,7 @@ Record mixin_of S (M : monad) : Type := Mixin {
   _ : forall s s', put s >> put s' = put s' ;
   _ : forall s, put s >> get = put s >> Ret s ;
   _ : get >>= put = skip ;
-  _ : forall k : S -> S -> M S,
+  _ : forall (A : Type) (k : S -> S -> M A),
     get >>= (fun s => get >>= k s) = get >>= fun s => k s s
 }.
 Record class_of S (m : Type -> Type) := Class {
@@ -49,15 +48,15 @@ Export MonadState.Exports.
 
 Section state_lemmas.
 Variables (S : Type) (M : stateMonad S).
-Lemma putget s : Put s >> Get = Put s >> Ret s :> M _.
-Proof. by case: M => m [[? ? ? ? ? []] ]. Qed.
-Lemma getputskip : Get >>= Put = skip :> M _.
-Proof. by case: M => m [[? ? ? ? ? []] ]. Qed.
 Lemma putput s s' : Put s >> Put s' = Put s' :> M _.
-Proof. by case: M => m [[? ? ? ? ? []] ]. Qed.
-Lemma getget (k : S -> S -> M S ) :
+Proof. by case: M => m [[[? ? ? ? []]]]. Qed.
+Lemma putget s : Put s >> Get = Put s >> Ret s :> M _.
+Proof. by case: M => m [[[? ? ? ? []]]]. Qed.
+Lemma getputskip : Get >>= Put = skip :> M _.
+Proof. by case: M => m [[[? ? ? ? []]]]. Qed.
+Lemma getget (k : S -> S -> M S) :
  (Get >>= (fun s => Get >>= k s)) = (Get >>= fun s => k s s).
-Proof. by case: M k => m [[? ? ? ? ? []] ]. Qed.
+Proof. by case: M k => m [[[? ? ? ? []]]]. Qed.
 End state_lemmas.
 
 Lemma putgetput S {M : stateMonad S} x {B} (k : _ -> M B) :
@@ -69,8 +68,8 @@ Definition overwrite {A S} {M : stateMonad S} s a : M A :=
 
 Example test_nonce0 (M : stateMonad nat) : M nat :=
   Get >>= (fun s => Put s.+1 >> Ret s).
-Reset test_nonce0.
-Fail Check test_nonce0.
+(*Reset test_nonce0.
+Fail Check test_nonce0.*)
 
 Module MonadRun.
 Record mixin_of S (M : monad) : Type := Mixin {
@@ -143,9 +142,9 @@ End staterun_lemmas.
 Module MonadNondetState.
 Record mixin_of (M : nondetMonad) : Type := Mixin {
   (* backtrackable state *)
-  _ : Laws.right_zero (@Bind M) (@Fail _) ;
+  _ : BindLaws.right_zero (@Bind M) (@Fail _) ;
   (* composition distributes rightwards over choice *)
-  _ : Laws.bind_right_distributive (@Bind M) [~p]
+  _ : BindLaws.right_distributive (@Bind M) [~p]
 }.
 Record class_of S (m : Type -> Type) : Type := Class {
   base : MonadNondet.class_of m ;
@@ -167,9 +166,9 @@ Export MonadNondetState.Exports.
 
 Section nondetstate_lemmas.
 Variables (S : Type) (M : nondetStateMonad S).
-Lemma bindmfail : Laws.right_zero (@Bind M) (@Fail _).
+Lemma bindmfail : BindLaws.right_zero (@Bind M) (@Fail _).
 Proof. by case: M => m [? ? [? ?]]. Qed.
-Lemma alt_bindDr : Laws.bind_right_distributive (@Bind M) (@Alt _).
+Lemma alt_bindDr : BindLaws.right_distributive (@Bind M) (@Alt _).
 Proof. by case: M => m [? ? []]. Qed.
 End nondetstate_lemmas.
 
@@ -198,9 +197,9 @@ Qed.
 Lemma putselectC (x : S) A (s : seq A) B (f : A * (seq A) -> M B) :
   Put x >> (do rs <- select s; f rs) = do rs <- select s; Put x >> f rs.
 Proof.
-rewrite selectE {1}fmap_def.
+rewrite selectE {1}fmapE.
 rewrite_ bindA.
-rewrite puttselectC [in RHS]fmap_def bindA.
+rewrite puttselectC [in RHS]fmapE bindA.
 bind_ext => x0; by rewrite 2!bindretf.
 Qed.
 
@@ -290,21 +289,23 @@ have {IH}IH : forall x, size x < size s ->
   move=> x xs; exact/constructive_indefinite_description/IH.
 case: s IH => [|h t] IH.
   rewrite unfoldME //=; by exists (ndRet [::]).
-rewrite unfoldME //=.
+rewrite unfoldME //.
+rewrite (_ : nilp _ = false) //.
 case: (Hf (h :: t)) => x Hx.
 rewrite -Hx.
 set g := fun y => match Bool.bool_dec (size y < size (h :: t)) true with
                | left H => let: exist x _ := IH _ H in x
                | _ => ndRet [::]
                end.
-refine (ex_intro _ (ndBind x (fun x => ndBind (g x.2) (@ndRet _ \o cons x.1 ))) _) => /=.
+refine (ex_intro _ (ndBind x (fun x => ndBind (g x.2) (@ndRet _ \o cons x.1 ))) _).
+rewrite [in LHS]/=.
 rewrite Hx size_f /bassert !bindA.
 bind_ext => -[x1 x2].
-rewrite /assert /guard /= ltnS.
+rewrite /assert /guard ltnS.
 case: ifPn => b1b2; last by rewrite !bindfailf.
-rewrite !bindskipf !bindretf /= /g.
-case: Bool.bool_dec => //= x2t.
-case: (IH x2) => // x0 <-; by rewrite fmap_def.
+rewrite !bindskipf !bindretf /g.
+case: Bool.bool_dec => // x2t.
+case: (IH x2) => // x0 <-; by rewrite fmapE.
 Qed.
 
 (* definition 5.1, mu2017 *)
@@ -349,7 +350,7 @@ Variables (A S : Type) (M : stateMonad S) (op : S -> A -> S).
 Local Open Scope mu_scope.
 
 Definition opmul x m : M _ :=
-  Get >>= fun st => let st' := op st x in cons st' ($) (Put st' >> m).
+  Get >>= fun st => let st' := op st x in fmap (cons st') (Put st' >> m).
 
 Definition loopp s xs : M (seq S) :=
   let mul x m := opmul x m in Put s >> foldr mul (Ret [::]) xs.
@@ -359,10 +360,10 @@ Proof. by []. Qed.
 
 Lemma loopp_of_scanl_helper s
   (ms : M S) (mu mu' : M unit) (m : M (seq S)) (f : S -> M unit) :
-  do x <- ms; mu >> (do xs <- cons s ($) (mu' >> m); f x >> Ret xs) =
-  cons s ($) (do x <- ms; mu >> mu' >> (do xs <- m; f x >> Ret xs)).
+  do x <- ms; mu >> (do xs <- fmap (cons s) (mu' >> m); f x >> Ret xs) =
+  fmap (cons s) (do x <- ms; mu >> mu' >> (do xs <- m; f x >> Ret xs)).
 Proof.
-rewrite [in RHS]fmap_def !bindA.
+rewrite [in RHS]fmapE !bindA.
 rewrite_ bindA.
 bind_ext => s'.
 rewrite !bindA; bind_ext; case.
@@ -388,19 +389,19 @@ set mul := fun (a : A) m => _.
 Inf rewrite !bindA.
 (* TODO(rei): tactic for nested function bodies? *)
 transitivity (do y <- Get; (Put s >> Get) >>= fun z =>
-  do a <- cons (op z x) ($) (Put (op z x) >> foldr mul (Ret [::]) xs);
+  do a <- fmap (cons (op z x)) (Put (op z x) >> foldr mul (Ret [::]) xs);
   Put y >> Ret a); last by Inf rewrite !bindA.
 rewrite_ putget.
 rewrite_ bindA.
 rewrite_ bindretf.
 rewrite loopp_of_scanl_helper.
-transitivity (cons (op s x) ($) do y <- Get; Put (op s x) >>
-  (do a <- foldr mul (Ret [::]) xs; Put y >> Ret a)); last first.
-  congr (_ ($) _); by rewrite_ putput.
-transitivity (cons (op s x) ($)
+transitivity (fmap (cons (op s x)) (do y <- Get; Put (op s x) >>
+  (do a <- foldr mul (Ret [::]) xs; Put y >> Ret a))); last first.
+  congr (fmap _ _); by rewrite_ putput.
+transitivity (fmap (cons (op s x))
   (do y <- Get; loopp (op s x) xs >>= overwrite y)); last first.
-  congr (_ ($) _); by Inf rewrite -bindA.
-by rewrite -IH fmap_retE.
+  congr (fmap _ _); by Inf rewrite -bindA.
+by rewrite -IH fmapE bindretf.
 Qed.
 
 End loop.
@@ -444,7 +445,7 @@ elim: xs x => [x|h t _ x].
 rewrite /= !bindA.
 transitivity (Put (op st x) >>
   (do x0 <- Get; do x1 <- let st' := op x0 h in
-    cons st' ($) (Put st' >> foldr (opmul op) (Ret [::]) t);
+    fmap (cons st') (Put st' >> foldr (opmul op) (Ret [::]) t);
     guard (ok (op st x)) >> guard (all ok x1)) : M _).
   bind_ext; case.
   bind_ext => st'.
@@ -463,7 +464,7 @@ Let B := A.
 Let res := @cons A.
 
 Definition opdot (a : A) (m : M (seq B)) : M (seq B) :=
-  Get >>= (fun st => guard (ok (op st a)) >> Put (op st a) >> (res a ($) m)).
+  Get >>= (fun st => guard (ok (op st a)) >> Put (op st a) >> fmap (res a) m).
 
 (* mu2017 *)
 Lemma theorem_53 (xs : seq A) :
@@ -499,7 +500,7 @@ transitivity (do st <- Get; guard (ok (op st x)) >>
   by rewrite put_foldr.
 transitivity (do st <- Get; guard (ok (op st x)) >>
   Put (op st x) >>
-    (cons x) ($) (foldr (opmul op) (Ret [::]) xs >>= (fun ys =>
+    fmap (cons x) (foldr (opmul op) (Ret [::]) xs >>= (fun ys =>
    guard (all ok ys)) >> Ret xs) : M _).
   bind_ext => st.
   rewrite !bindA.
@@ -509,8 +510,8 @@ transitivity (do st <- Get; guard (ok (op st x)) >>
   bind_ext => s.
   rewrite fcompE fmap_bind /=.
   bind_ext; case.
-  by rewrite fcompE fmap_retE.
-by rewrite /= -IH /opdot !bindA.
+  by rewrite fcompE fmapE bindretf.
+by rewrite [in RHS]/= -IH /opdot !bindA.
 Qed.
 
 End section_51.
@@ -569,18 +570,18 @@ Proof. move=> ps t; apply: contra ps; by case/segment_closed.H. Qed.
 (* assert p distributes over concatenation *)
 Definition promote_assert (M : failMonad) A
   (p : pred (seq A)) (q : pred (seq A * seq A)) :=
-  (bassert p) \o (fmap ucat) \o mpair =
-  (fmap ucat) \o (bassert q) \o mpair \o (bassert p)`^2 :> (_ -> M _).
+  (bassert p) \o (M # ucat) \o mpair =
+  (M # ucat) \o (bassert q) \o mpair \o (bassert p)^`2 :> (_ -> M _).
 
 Lemma promote_assert_sufficient_condition (M : failMonad) A :
-  Laws.right_zero (@Bind M) (@Fail _) ->
+  BindLaws.right_zero (@Bind M) (@Fail _) ->
   forall (p : segment_closed.t A) q, promotable p q ->
   promote_assert M p q.
 Proof.
 move=> right_z p q promotable_pq.
-rewrite /promote_assert.
-apply functional_extensionality => -[x1 x2] /=.
-rewrite {1}/bassert [in RHS]fmap_def [in LHS]bind_fmap !bindA.
+rewrite /promote_assert funeqE => -[x1 x2].
+rewrite 3![in RHS]compE -/(fmap _ _) [in RHS]fmapE.
+rewrite 2![in LHS]compE {1}/bassert [in LHS]bind_fmap !bindA.
 bind_ext => s.
 rewrite 2!bindA bindretf 2!bindA.
 rewrite {1}[in RHS]/guard.
@@ -674,7 +675,7 @@ Record mixin_of S (M : failMonad) (fresh : M S) : Type := Mixin {
   distinct : segment_closed.t S ;
   _ : bassert distinct \o symbols = symbols ;
   (* failure is a right zero of composition (backtracking interpretation) *)
-  _ : Laws.right_zero (@Bind M) (@Fail _)
+  _ : BindLaws.right_zero (@Bind M) (@Fail _)
 }.
 Record class_of S (m : Type -> Type) := Class {
   base : MonadFail.class_of m ;
@@ -704,7 +705,7 @@ Export MonadFailFresh.Exports.
 
 Section failfresh_lemmas.
 Variables (S : eqType) (M : failFreshMonad S).
-Lemma failfresh_bindmfail : Laws.right_zero (@Bind M) (@Fail _).
+Lemma failfresh_bindmfail : BindLaws.right_zero (@Bind M) (@Fail _).
 Proof. by case: M => m [? ? []]. Qed.
 Lemma bassert_symbols : bassert (Distinct M) \o Symbols = Symbols :> (nat -> M _).
 Proof. by case: M => m [? ? []]. Qed.
@@ -724,33 +725,190 @@ Lemma SymbolsS n : Symbols n.+1 =
 Proof. by rewrite SymbolsE. Qed.
 
 Lemma Symbols_prop1 :
-  Symbols \o const 1 = fmap wrap \o const Fresh :> (A -> M _).
+  Symbols \o const 1 = (M # wrap) \o const Fresh :> (A -> M _).
 Proof.
-apply functional_extensionality => n.
+rewrite funeqE => n.
 transitivity (@Symbols _ M 1) => //.
 rewrite SymbolsE sequence_cons sequence_nil.
 rewrite_ bindretf.
-by rewrite /= fmap_def.
+by rewrite compE -/(fmap _ _) [in RHS]fmapE.
 Qed.
 
 Lemma Symbols_prop2 :
-  Symbols \o uaddn = fmap ucat \o mpair \o (Symbols : _ -> M _)`^2.
+  Symbols \o uaddn = (M # ucat) \o mpair \o (Symbols : _ -> M _)^`2.
 Proof.
-apply functional_extensionality => -[n1 n2].
-elim: n1 => /= [|n1 IH].
-  rewrite uaddnE add0n Symbols0 bindretf fmap_bind.
+rewrite funeqE => -[n1 n2].
+elim: n1 => [|n1 IH].
+  rewrite [in LHS]compE uaddnE add0n.
+  rewrite compE [in X in _ = _ X]/= squaringE Symbols0.
+  rewrite compE -/(fmap _ _) [in RHS]fmapE bindA bindretf.
+  rewrite -fmapE fmap_bind.
   Open (X in _ >>= X).
-    rewrite fcompE fmap_retE /=; reflexivity.
+    rewrite fcompE fmapE bindretf /=; reflexivity.
   by rewrite bindmret.
-rewrite uaddnE addSn SymbolsS {}IH SymbolsS.
-rewrite [in RHS]fmap_bind bindA; bind_ext => a.
-rewrite fmap_bind 2!bindA.
+rewrite compE uaddnE addSn SymbolsS -uaddnE -(compE Symbols) {}IH.
+rewrite [in RHS]compE [in X in _ = _ X]/= squaringE SymbolsS.
+rewrite [in RHS]compE -/(fmap _ _) fmap_bind bindA; bind_ext => a.
+rewrite 2![in LHS]compE -/(fmap _ _) [in LHS]fmap_bind [in LHS]bindA [in RHS]bindA.
 (* TODO(rei): bind_ext? *)
-congr Bind; apply functional_extensionality => s.
-rewrite bindretf 2!fcompE bind_fmap fmap_bind bindA.
+congr Bind; rewrite funeqE => s.
+rewrite [in RHS]bindretf [in RHS]fcompE [in RHS]fmap_bind.
+rewrite [in LHS]fcompE [in LHS]bind_fmap [in LHS]bindA.
 rewrite_ bindretf.
 rewrite_ fcompE.
-by rewrite_ fmap_retE.
+rewrite_ fmapE.
+by rewrite_ bindretf.
 Qed.
 
 End properties_of_Symbols.
+
+Module MonadArray.
+Record mixin_of S (I : eqType) (M : monad) : Type := Mixin {
+  get : I -> M S ;
+  put : I -> S -> M unit ;
+  _ : forall i s s', put i s >> put i s' = put i s' ;
+  _ : forall i s (A : Type) (k : S -> M A), put i s >> get i >>= k =
+      put i s >> k s ;
+  _ : forall i, get i >>= put i = skip ;
+  _ : forall i (A : Type) (k : S -> S -> M A),
+    get i >>= (fun s => get i >>= k s) = get i >>= fun s => k s s ;
+  _ : forall i j (A : Type) (k : S -> S -> M A),
+    get i >>= (fun u => get j >>= (fun v => k u v)) =
+    get j >>= (fun v => get i >>= (fun u => k u v)) ;
+  _ : forall i j u v, (i != j) \/ (u = v) ->
+    put i u >> put j v = put j v >> put i u ;
+  _ : forall i j u (A : Type) (k : S -> M A), i != j ->
+    put i u >> get j >>= k =
+    get j >>= (fun v => put i u >> k v)
+}.
+Record class_of S (I : eqType) (m : Type -> Type) := Class {
+  base : Monad.class_of m ; mixin : mixin_of S I (Monad.Pack base) }.
+Structure t S (I : eqType) : Type :=
+  Pack { m : Type -> Type ; class : class_of S I m }.
+(* inheritance *)
+Definition baseType S I (M : t S I) := Monad.Pack (base (class M)).
+Module Exports.
+Definition aGet S I (M : t S I) : I -> m M S :=
+  let: Pack _ (Class _ (Mixin x _ _ _ _ _ _ _ _)) := M return I -> m M S in x.
+Arguments aGet {S I M} : simpl never.
+Definition aPut S I (M : t S I) : I -> S -> m M unit :=
+  let: Pack _ (Class _ (Mixin _ x _ _ _ _ _ _ _ )) := M
+    return I -> S -> m M unit in x.
+Arguments aPut {S I M} : simpl never.
+Notation arrayMonad := t.
+Coercion baseType : arrayMonad >-> monad.
+Canonical baseType.
+End Exports.
+End MonadArray.
+Export MonadArray.Exports.
+
+Section monadarray_lemmas.
+Variables (S : Type) (I : eqType) (M : arrayMonad S I).
+Lemma aputput i s s' : aPut i s >> aPut i s' = aPut i s' :> M _.
+Proof. by case: M => ? [? []]. Qed.
+Lemma aputget i s A (k : S -> M A) : aPut i s >> aGet i >>= k =
+    aPut i s >> k s :> M _.
+Proof. by case: M k => ? [? []]. Qed.
+Lemma agetputskip i : aGet i >>= aPut i = skip :> M _.
+Proof. by case: M => ? [? []]. Qed.
+Lemma agetget i A (k : S -> S -> M A) :
+  aGet i >>= (fun s => aGet i >>= k s) = aGet i >>= fun s => k s s.
+Proof. by case: M k => ? [? []]. Qed.
+Lemma agetC i j A (k : S -> S -> M A) :
+  aGet i >>= (fun u => aGet j >>= (fun v => k u v)) =
+  aGet j >>= (fun v => aGet i >>= (fun u => k u v)).
+Proof. by case: M k => ? [? []]. Qed.
+Lemma aputC i j u v : i != j \/ u = v ->
+  aPut i u >> aPut j v = aPut j v >> aPut i u :> M _.
+Proof. by case: M i j u v => ? [? []]. Qed.
+Lemma aputgetC i j u A (k : S -> M A) : i != j ->
+  aPut i u >> aGet j >>= (fun v => k v) =
+  aGet j >>= (fun v => aPut i u >> k v).
+Proof. by case: M i j u A k => ? [? []]. Qed.
+End monadarray_lemmas.
+
+Section monadarray_example.
+
+Variables (M : arrayMonad nat bool_eqType).
+
+Definition swap : M unit :=
+  do x <- aGet false ;
+  do y <- aGet true ;
+  aPut false y >>
+  aPut true x.
+
+Definition does_swap (m : M unit) :=
+  (do x <- aGet false ;
+   do y <- aGet true ;
+   m >>
+   do x' <- aGet false ;
+   do y' <- aGet true ;
+   Ret ((x == y') && (y == x'))).
+
+Lemma swapP (m : M unit) :
+  does_swap swap = swap >> Ret true.
+Proof.
+rewrite /swap /does_swap.
+transitivity (
+  do x <- aGet false;
+  do y <- aGet true;
+  do x0 <- aGet false;
+  (do y0 <- aGet true; aPut false y0 >> aPut true x0) >>
+  (do x' <- aGet false; do y' <- aGet true; Ret ((x == y') && (y == x'))) : M _).
+  bind_ext => x; by rewrite_ bindA. (* TODO: should be shorter *)
+rewrite agetC.
+rewrite_ agetget.
+transitivity (
+  do x <- aGet true;
+  do s <- aGet false;
+  do y0 <- aGet true; (aPut false y0 >> aPut true s) >>
+  (do x' <- aGet false; do y' <- aGet true; Ret ((s == y') && (x == x'))) : M _).
+  bind_ext => x; by rewrite_ bindA. (* TODO: should be shorter *)
+rewrite agetC.
+rewrite_ agetget.
+transitivity (
+  do x <- aGet false;
+  do s <- aGet true;
+  (aPut false s >> (aPut true x >>
+  do y' <- aGet true; do x' <- aGet false; Ret ((x == y') && (s == x')))) : M _).
+  bind_ext => x. bind_ext => y. rewrite bindA. bind_ext; case. by rewrite_ agetC.
+transitivity (
+  do x <- aGet false;
+  do s <- aGet true;
+  (aPut false s >> (aPut true x >>
+  do x' <- aGet false; Ret ((x == x) && (s == x')))) : M _).
+  bind_ext => x.
+  bind_ext => y.
+  bind_ext; case.
+  by rewrite -bindA aputget.
+transitivity (
+  do x <- aGet false;
+  do s <- aGet true;
+  (aPut true x >> aPut false s >> (do x' <- aGet false; Ret ((x == x) && (s == x')))) : M _).
+  bind_ext => x.
+  bind_ext => y.
+  rewrite -bindA aputC //=; by left.
+transitivity (
+  do x <- aGet false;
+  do s <- aGet true;
+  (aPut true x >> aPut false s) >> Ret ((x == x) && (s == s)) : M _).
+  bind_ext => x.
+  bind_ext => y.
+  rewrite 2!bindA.
+  bind_ext; case.
+  by rewrite -bindA aputget.
+transitivity (
+  do x <- aGet false;
+  do s <- aGet true;
+  (aPut true x >> aPut false s) >> Ret true : M _).
+  bind_ext => x.
+  bind_ext => y.
+  by rewrite 2!eqxx.
+rewrite bindA.
+bind_ext => x.
+rewrite bindA.
+bind_ext => y.
+rewrite aputC //; by left.
+Qed.
+
+End monadarray_example.

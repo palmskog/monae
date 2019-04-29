@@ -1,8 +1,7 @@
-Require Import FunctionalExtensionality Coq.Program.Tactics ProofIrrelevance.
-Require Classical.
 Require Import ssreflect ssrmatching ssrfun ssrbool.
 From mathcomp Require Import eqtype ssrnat seq path div choice fintype tuple.
 From mathcomp Require Import finfun bigop.
+From mathcomp Require Import boolp.
 Require Import monad.
 
 Set Implicit Arguments.
@@ -43,14 +42,14 @@ Hypothesis opP : forall (x y : A) (w : seq A), (foldl op b w (.) x) (.) y = (fol
 Lemma lemma_35 a :
   foldl op b (o) insert a = Ret \o foldl op b \o (rcons^~ a) :> (_ -> M _).
 Proof.
-apply functional_extensionality => xs; move: xs; elim/last_ind => [/=|xs y IH].
-  by rewrite fcompE insertE fmap_retE.
+rewrite funeqE; elim/last_ind => [/=|xs y IH].
+  by rewrite fcompE insertE fmapE bindretf.
 rewrite fcompE.
 rewrite insert_rcons.
-rewrite naturality_nondeter fmap_retE.
+rewrite naturality_nondeter fmapE bindretf.
 rewrite -fmap_comp.
 have H : forall w, foldl op b \o rcons^~ w = op^~ w \o foldl op b.
-  by move=> w; apply functional_extensionality => ws /=; rewrite -cats1 foldl_cat.
+  by move=> w; rewrite funeqE => ws /=; rewrite -cats1 foldl_cat.
 rewrite (H y).
 rewrite fmap_comp.
 rewrite fcompE in IH.
@@ -58,7 +57,7 @@ rewrite IH.
 rewrite -[in X in _ [~] X]bindretf.
 rewrite bindretf.
 rewrite -{1}compA.
-rewrite fmap_retE.
+rewrite fmapE bindretf.
 rewrite (H a).
 rewrite [in X in _ [~] X]/=.
 rewrite opP.
@@ -77,9 +76,9 @@ Hypothesis opP : forall (x y : A) (w : B), (w (.) x) (.) y = (w (.) y) (.) x.
 
 Lemma lemma_34 b : foldl op b (o) perm = Ret \o foldl op b :> (_ -> M _).
 Proof.
-apply functional_extensionality => xs; move: xs b; elim => [/=|x xs IH] b.
-  by rewrite fcompE fmap_retE.
-rewrite fcompE [in LHS]/= fmap_bind.
+rewrite funeqE => xs; move: xs b; elim => [/=|x xs IH] b.
+  by rewrite fcompE fmapE bindretf.
+rewrite fcompE fmap_bind.
 have opP' : forall (x y : A) (w : seq A), (foldl op b w (.) x) (.) y = (foldl op b w (.) y) (.) x.
   move=> ? ? ?.
   by rewrite opP.
@@ -87,7 +86,7 @@ rewrite_ (lemma_35 M opP').
 transitivity ((Ret \o foldl op (b (.) x)) xs : M _); last by [].
 rewrite -IH.
 rewrite [in RHS]fcompE.
-rewrite fmap_def.
+rewrite fmapE.
 bind_ext => ys.
 rewrite /= -cats1 foldl_cat /=.
 congr (Ret _ : M _).
