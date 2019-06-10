@@ -282,7 +282,7 @@ Variable (A : convType).
 
 Canonical necset_subType := [subType for @NECSet.car A].
 Canonical necset_predType :=
-  Eval hnf in mkPredType (fun t : necset A => (fun x => x \in NECSet.car t)).
+  Eval hnf in PredType (fun t : necset A => (fun x => x \in NECSet.car t)).
 Definition necset_eqMixin := Eval hnf in [eqMixin of (@necset A) by <:].
 Canonical necset_eqType := Eval hnf in EqType (necset A) necset_eqMixin.
 Definition necset_choiceMixin : Choice.mixin_of (necset A) := @gen_choiceMixin (necset A).

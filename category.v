@@ -715,7 +715,6 @@ Lemma fmap_id : FunctorLaws.id fmap.
 Proof.
 move=> A; apply hom_extext=>m. rewrite /fmap.
 rewrite/idfun/=.
-rewrite /funcomp.
 rewrite -[in RHS](bindmret m).
 congr (fun f => bind f m).
 by rewrite hom_ext.

@@ -437,9 +437,9 @@ set T := FComp g f.
 (*congr (muM g eps).*)
 have -> : (T # (fun x : A => muM eps ((T # bc) (ab x)))) x =
          (T # (muM eps (A:=C))) ((T # (T # bc)) ((T # ab) x)).
-  rewrite functor_o /funcomp.
+  rewrite functor_o.
   congr (T # muM eps (A:=C)).
-  by rewrite functor_o /funcomp.
+  by rewrite functor_o.
 move: muMA (muM_natural bc).
 set M := M f g.
 set muM := muM eps.
